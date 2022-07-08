@@ -1,0 +1,1 @@
+from gym_uav_collision_avoidance.envs.uav_world_2d import UAVWorld2D
