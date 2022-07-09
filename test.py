@@ -15,8 +15,21 @@ n_actions = env.action_space.shape[-1]
 total_episodes = 1000
 evaluate = False
 
-agent = ddpg.Agent(input_dims=(5,), n_actions=n_actions, batch_size=256, fc1=700, fc2=600, alpha=0.0001, beta=0.0002)
+agent = ddpg.Agent(input_dims=(5,), n_actions=n_actions, batch_size=128, replay_buffer_size=10000, fc1=800, fc2=800, alpha=0.001, beta=0.002, tau=0.01)
 
+if evaluate:
+    observation = env.reset()
+    state = np.array([
+                    observation['normalized_agent_speed'][0],
+                    observation['normalized_agent_speed'][1],
+                    observation['normalized_target_relative_position'][0],
+                    observation['normalized_target_relative_position'][1],
+                    # observation['normalized_relative_target_theta'],
+                    # observation['normalized_agent_theta'],
+                    observation['normalized_delta_theta'],
+                ])    
+    agent.choose_action(state, evaluate)            
+    agent.load_models(evaluate)
 
 for i in range(total_episodes):
     observation = env.reset()
@@ -30,18 +43,22 @@ for i in range(total_episodes):
                     observation['normalized_agent_speed'][1],
                     observation['normalized_target_relative_position'][0],
                     observation['normalized_target_relative_position'][1],
+                    # observation['normalized_relative_target_theta'],
+                    # observation['normalized_agent_theta'],
                     observation['normalized_delta_theta'],
                 ])    
-        action = agent.choose_action(state, evaluate)
-        action = action * env.action_space.high        
-        observation, reward, done, info = env.step(action)
+        action = agent.choose_action(state, evaluate)        
+        observation, reward, done, info = env.step( action * env.action_space.high)
         new_state = np.array([
                     observation['normalized_agent_speed'][0],
                     observation['normalized_agent_speed'][1],
                     observation['normalized_target_relative_position'][0],
                     observation['normalized_target_relative_position'][1],
+                    # observation['normalized_relative_target_theta'],
+                    # observation['normalized_agent_theta'],
                     observation['normalized_delta_theta'],
-                ])  
+                ])
+        # print(new_state)
         agent.remember(state, action, reward, new_state, done)
         if not evaluate:                                
             agent.learn()  

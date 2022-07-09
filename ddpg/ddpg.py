@@ -8,13 +8,14 @@ from ddpg.ou_noise import OrnsteinUhlenbeckActionNoise
 
 class Agent:
     def __init__(self, input_dims, alpha=0.001, beta=0.002, env=None,
-            gamma=0.99, n_actions=2, replay_buffer_size=1000000, tau=0.005, 
+            gamma=0.995, n_actions=2, replay_buffer_size=1000000, tau=0.001, 
             fc1=512, fc2=512, batch_size=64, noise=0.1):
         self.gamma = gamma
         self.tau = tau
         self.memory = ReplayBuffer(replay_buffer_size, input_dims, n_actions)
         self.batch_size = batch_size
         self.n_actions = n_actions
+        self.input_dims = input_dims
         # self.noise = noise
         self.noise = OrnsteinUhlenbeckActionNoise(mu=np.zeros(n_actions))
         #self.max_action = env.action_space.high[0]
@@ -57,6 +58,11 @@ class Agent:
         self.target_actor.save_weights(self.target_actor.checkpoint_file, overwrite=True)
         self.critic.save_weights(self.critic.checkpoint_file, overwrite=True)
         self.target_critic.save_weights(self.target_critic.checkpoint_file, overwrite=True)
+        try:
+            print( self.actor.input_shape)
+            print( self.critic.input_shape)
+        except:
+            pass
 
     def save_models_final(self):
         print('... saving final models ...')
@@ -65,12 +71,13 @@ class Agent:
         self.critic.save_weights(self.critic.checkpoint_file_final, overwrite=True)
         self.target_critic.save_weights(self.target_critic.checkpoint_file_final, overwrite=True)
 
-    def load_models(self):
-        print('... loading models ...')
-        self.actor.load_weights(self.actor.checkpoint_file)
-        self.target_actor.load_weights(self.target_actor.checkpoint_file)
-        self.critic.load_weights(self.critic.checkpoint_file)
-        self.target_critic.load_weights(self.target_critic.checkpoint_file)
+    def load_models(self, evaluate):
+        print('... loading models ...') 
+        self.actor.load_weights(self.actor.checkpoint_file)        
+        if not evaluate:
+            self.target_actor.load_weights(self.target_actor.checkpoint_file)        
+            self.critic.load_weights(self.critic.checkpoint_file)        
+            self.target_critic.load_weights(self.target_critic.checkpoint_file)
     
     def load_models_final(self):
         print('... loading final models ...')

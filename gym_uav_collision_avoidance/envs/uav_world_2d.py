@@ -34,20 +34,24 @@ class UAVWorld2D(gym.Env):
 
         # Observations are dictionaries with the agent's and the target's location.
         # Each location is encoded as an element of {0, ..., `size`}^2, i.e. MultiDiscrete([size, size]).
-        self.observation_space = spaces.Dict(
-            {
-                # "agent": spaces.Box(low=np.concatenate((self.min_location, self.min_speed)),
-                #     high=np.concatenate((self.max_location, self.max_speed)), dtype=np.float32),
-                # "target": spaces.Box(low=self.min_location, high=self.max_location, dtype=np.float32),
-                # "agent_speed": spaces.Box(low=self.min_speed, high=self.max_speed, shape=(2,), dtype=np.float32),
-                # "agent_theta": spaces.Box(low=-math.pi, high=math.pi, shape=(1,), dtype=np.float32),
-                # "target_distance": spaces.Box(low=-np.linalg.norm(self.max_location-self.min_location), high=np.linalg.norm(self.max_location-self.min_location), shape=(1,), dtype=np.float32),
-                # "target_theta": spaces.Box(low=-math.pi, high=math.pi, shape=(1,), dtype=np.float32),
-                "normalized_agent_speed": spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
-                "normalized_target_relative_position": spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
-                "normalized_delta_theta": spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32),
-            }
-        )
+        # self.observation_space = spaces.Dict(
+        #     {
+        #         # "agent": spaces.Box(low=np.concatenate((self.min_location, self.min_speed)),
+        #         #     high=np.concatenate((self.max_location, self.max_speed)), dtype=np.float32),
+        #         # "target": spaces.Box(low=self.min_location, high=self.max_location, dtype=np.float32),
+        #         # "agent_speed": spaces.Box(low=self.min_speed, high=self.max_speed, shape=(2,), dtype=np.float32),
+        #         # "agent_theta": spaces.Box(low=-math.pi, high=math.pi, shape=(1,), dtype=np.float32),
+        #         # "target_distance": spaces.Box(low=-np.linalg.norm(self.max_location-self.min_location), high=np.linalg.norm(self.max_location-self.min_location), shape=(1,), dtype=np.float32),
+        #         # "target_theta": spaces.Box(low=-math.pi, high=math.pi, shape=(1,), dtype=np.float32),
+        #         "normalized_agent_speed": spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+        #         "normalized_target_relative_position": spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+        #         "normalized_relative_target_theta": spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32),
+        #         "normalized_agent_theta": spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32),
+        #         "normalized_delta_theta": spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32),
+        #     }
+        # )
+
+        self.observation_space = spaces.Box(-1, 1, shape=(5,), dtype=np.float32)
 
         # We have 4 actions, corresponding to "right", "up", "left", "down", "right"
         # self.action_space = spaces.Dict(
@@ -74,21 +78,31 @@ class UAVWorld2D(gym.Env):
         normalized_target_relative_position = (self._target_location - self._agent_location) / self.map_diagonal_size
         target_theta = math.atan2((self._target_location - self._agent_location)[1],(self._target_location - self._agent_location)[0])
         agent_theta = math.atan2(self._agent_speed[1],self._agent_speed[0])
+        normalized_relative_target_theta = target_theta / math.pi
+        normalized_agent_theta = agent_theta / math.pi
         delta_theta = target_theta - agent_theta
         delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta)) 
         normalized_delta_theta = delta_theta / math.pi
 
-        return {
-            # "agent_speed": np.concatenate((self._agent_location, self._agent_speed)),            
-            # "target": self._target_location,            
-            # "agent_speed": self.normalized_agent_speed,
-            # "agent_theta": math.atan2(self._agent_speed[1],self._agent_speed[0]),
-            # "target_distance": np.linalg.norm(self._target_location - self._agent_location),
-            # "target_theta": math.atan2((self._target_location - self._agent_location)[1],(self._target_location - self._agent_location)[0]),
-            "normalized_agent_speed": normalized_agent_speed,
-            "normalized_target_relative_position": normalized_target_relative_position,
-            "normalized_delta_theta": normalized_delta_theta,
-        }
+        # return {
+        #     # "agent_speed": np.concatenate((self._agent_location, self._agent_speed)),            
+        #     # "target": self._target_location,            
+        #     # "agent_speed": self.normalized_agent_speed,
+        #     # "agent_theta": math.atan2(self._agent_speed[1],self._agent_speed[0]),
+        #     # "target_distance": np.linalg.norm(self._target_location - self._agent_location),
+        #     # "target_theta": math.atan2((self._target_location - self._agent_location)[1],(self._target_location - self._agent_location)[0]),
+        #     "normalized_agent_speed": normalized_agent_speed,
+        #     "normalized_target_relative_position": normalized_target_relative_position,
+        #     "normalized_relative_target_theta": normalized_relative_target_theta,
+        #     "normalized_agent_theta": normalized_agent_theta,
+        #     "normalized_delta_theta": normalized_delta_theta,
+        # }
+        return np.array([normalized_agent_speed[0],
+                         normalized_agent_speed[1],
+                         normalized_target_relative_position[0],
+                         normalized_target_relative_position[1],
+                         normalized_delta_theta]
+                        )
 
     def _get_info(self):
         return {
@@ -102,19 +116,19 @@ class UAVWorld2D(gym.Env):
         self._agent_speed_prev = self._agent_speed        
 
         # Choose the goal's location uniformly at random
-        # self._target_location = np.random.uniform(self.min_location, high=self.max_location, size=(2,)).astype(np.float32)        
-        self._target_location = np.zeros(2)
+        self._target_location = np.random.uniform(self.min_location, high=self.max_location, size=(2,)).astype(np.float32)        
+        # self._target_location = np.zeros(2)
 
         self._init_target_distance = np.linalg.norm(self._target_location - self._agent_location)
         self._prev_distance = self._init_target_distance 
+        self.steps = 0
 
         observation = self._get_obs()
         info = self._get_info()
         return (observation, info) if return_info else observation
 
     def step(self, action):            
-        # We use `np.clip` to make sure we don't leave the grid
-        # dt = self.clock.tick(60) * 0.001        
+        # We use `np.clip` to make sure we don't leave the grid           
         # dx = np.concatenate((action['vel_x'], action['vel_y']) , axis=0) * self.tau
         # action_noise = np.random.normal(np.zeros_like(action), self.max_speed * 0.01)        
         # action += action_noise
@@ -128,13 +142,13 @@ class UAVWorld2D(gym.Env):
         distance = np.linalg.norm(self._target_location - self._agent_location)      
 
         reward = 0 
-        reward -= self._init_target_distance / self.map_diagonal_size        
-        reward += 100 * (self._prev_distance - distance) * (self._init_target_distance / self.map_diagonal_size)
+        reward -= 1 / self._init_target_distance        
+        reward += 10 * (self._prev_distance - distance)
         delta_theta = math.atan2((self._target_location - self._agent_location)[1],(self._target_location - self._agent_location)[0]) - math.atan2(self._agent_speed[1],self._agent_speed[0])
         delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta))            
-        reward -= abs(delta_theta)
+        reward -= 0.1 * abs(delta_theta)
 
-        if distance < 0.1:  # An episode is done if the agent has reached the target        
+        if distance < 0.5:  # An episode is done if the agent has reached the target        
             done = True            
             reward += 1000
         elif (clipped_location != self._agent_location).any():  # An episode is done if the agent has gone out of box            
@@ -144,7 +158,8 @@ class UAVWorld2D(gym.Env):
             done = False
           
         observation = self._get_obs()        
-        info = self._get_info()                        
+        info = self._get_info()                  
+        self.steps += 1      
         
         self._prev_distance = distance                
         return observation, reward, done, info
