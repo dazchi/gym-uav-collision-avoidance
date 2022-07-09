@@ -10,9 +10,11 @@ observation, info = env.reset(return_info=True)
 while True:
     observation, reward, done, info = env.step(env.action_space.sample())
     env.render()
-
+    
+    # print(observation)
     if done:
         observation, info = env.reset(return_info=True)    
+    
         
 
 env.close()

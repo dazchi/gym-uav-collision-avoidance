@@ -1,5 +1,7 @@
+from cmath import cos, pi
 import math
-from cv2 import resizeWindow
+from turtle import position
+from cv2 import normalize, resizeWindow
 import gym
 from gym import spaces
 import pygame
@@ -7,11 +9,13 @@ import numpy as np
 
 
 class UAVWorld2D(gym.Env):
-    metadata = {"render_fps": 60}
+    metadata = {"render_fps": 1000}
 
     def __init__(self, x_size=100.0, y_size=100.0, agent_num=4, max_speed=12.0, max_acceleration=5.0):
         self.x_size = x_size # size of x dimension
         self.y_size = y_size # size of y dimension
+        self.map_diagonal_size = np.linalg.norm([x_size, y_size])
+        self.map_dimension = np.array([x_size, y_size])
         self.min_location = np.array([-x_size/2.0, -y_size/2.0])
         self.max_location = np.array([x_size/2.0, y_size/2.0])        
         self.max_speed = np.array([max_speed, max_speed]) # Maximum speed of uav
@@ -32,9 +36,16 @@ class UAVWorld2D(gym.Env):
         # Each location is encoded as an element of {0, ..., `size`}^2, i.e. MultiDiscrete([size, size]).
         self.observation_space = spaces.Dict(
             {
-                "agent": spaces.Box(low=np.concatenate((self.min_location, self.min_speed)),
-                    high=np.concatenate((self.max_location, self.max_speed)), dtype=np.float32),
-                "target": spaces.Box(low=self.min_location, high=self.max_location, dtype=np.float32),
+                # "agent": spaces.Box(low=np.concatenate((self.min_location, self.min_speed)),
+                #     high=np.concatenate((self.max_location, self.max_speed)), dtype=np.float32),
+                # "target": spaces.Box(low=self.min_location, high=self.max_location, dtype=np.float32),
+                # "agent_speed": spaces.Box(low=self.min_speed, high=self.max_speed, shape=(2,), dtype=np.float32),
+                # "agent_theta": spaces.Box(low=-math.pi, high=math.pi, shape=(1,), dtype=np.float32),
+                # "target_distance": spaces.Box(low=-np.linalg.norm(self.max_location-self.min_location), high=np.linalg.norm(self.max_location-self.min_location), shape=(1,), dtype=np.float32),
+                # "target_theta": spaces.Box(low=-math.pi, high=math.pi, shape=(1,), dtype=np.float32),
+                "normalized_agent_speed": spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+                "normalized_target_relative_position": spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+                "normalized_delta_theta": spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32),
             }
         )
 
@@ -59,7 +70,25 @@ class UAVWorld2D(gym.Env):
         self.clock = None
 
     def _get_obs(self):
-        return {"agent": np.concatenate((self._agent_location, self._agent_speed)), "target": self._target_location}
+        normalized_agent_speed = self._agent_speed / self.max_speed
+        normalized_target_relative_position = (self._target_location - self._agent_location) / self.map_diagonal_size
+        target_theta = math.atan2((self._target_location - self._agent_location)[1],(self._target_location - self._agent_location)[0])
+        agent_theta = math.atan2(self._agent_speed[1],self._agent_speed[0])
+        delta_theta = target_theta - agent_theta
+        delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta)) 
+        normalized_delta_theta = delta_theta / math.pi
+
+        return {
+            # "agent_speed": np.concatenate((self._agent_location, self._agent_speed)),            
+            # "target": self._target_location,            
+            # "agent_speed": self.normalized_agent_speed,
+            # "agent_theta": math.atan2(self._agent_speed[1],self._agent_speed[0]),
+            # "target_distance": np.linalg.norm(self._target_location - self._agent_location),
+            # "target_theta": math.atan2((self._target_location - self._agent_location)[1],(self._target_location - self._agent_location)[0]),
+            "normalized_agent_speed": normalized_agent_speed,
+            "normalized_target_relative_position": normalized_target_relative_position,
+            "normalized_delta_theta": normalized_delta_theta,
+        }
 
     def _get_info(self):
         return {
@@ -70,10 +99,15 @@ class UAVWorld2D(gym.Env):
         # Choose the UoI's location uniformly at random
         self._agent_location = np.random.uniform(self.min_location, high=self.max_location, size=(2,)).astype(np.float32)
         self._agent_speed = np.random.uniform(self.min_speed, high=self.max_speed, size=(2,)).astype(np.float32)
-        self._agent_speed_prev = self._agent_speed
+        self._agent_speed_prev = self._agent_speed        
 
         # Choose the goal's location uniformly at random
-        self._target_location = np.random.uniform(self.min_location, high=self.max_location, size=(2,)).astype(np.float32)        
+        # self._target_location = np.random.uniform(self.min_location, high=self.max_location, size=(2,)).astype(np.float32)        
+        self._target_location = np.zeros(2)
+
+        self._init_target_distance = np.linalg.norm(self._target_location - self._agent_location)
+        self._prev_distance = self._init_target_distance 
+
         observation = self._get_obs()
         info = self._get_info()
         return (observation, info) if return_info else observation
@@ -82,31 +116,37 @@ class UAVWorld2D(gym.Env):
         # We use `np.clip` to make sure we don't leave the grid
         # dt = self.clock.tick(60) * 0.001        
         # dx = np.concatenate((action['vel_x'], action['vel_y']) , axis=0) * self.tau
-        action_noise = np.random.normal(np.zeros_like(action), self.max_speed * 0.01)        
-        action += action_noise
+        # action_noise = np.random.normal(np.zeros_like(action), self.max_speed * 0.01)        
+        # action += action_noise
         dv = np.clip((action - self._agent_speed_prev)/self.tau, self.min_acceleratoin, self.max_acceleratoin)
         self._agent_speed = self._agent_speed_prev + dv * self.tau
-        dx = self._agent_speed * self.tau
+        dx = self._agent_speed * self.tau        
         self._agent_location += dx
         self._agent_speed_prev = self._agent_speed
         clipped_location = np.clip(self._agent_location, self.min_location , self.max_location)
-                
-        distance = np.linalg.norm(self._target_location - self._agent_location)        
+
+        distance = np.linalg.norm(self._target_location - self._agent_location)      
+
+        reward = 0 
+        reward -= self._init_target_distance / self.map_diagonal_size        
+        reward += 100 * (self._prev_distance - distance) * (self._init_target_distance / self.map_diagonal_size)
+        delta_theta = math.atan2((self._target_location - self._agent_location)[1],(self._target_location - self._agent_location)[0]) - math.atan2(self._agent_speed[1],self._agent_speed[0])
+        delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta))            
+        reward -= abs(delta_theta)
+
         if distance < 0.1:  # An episode is done if the agent has reached the target        
-            done = True
-            reward = 100
-        elif (clipped_location != self._agent_location).any():  # An episode is done if the agent has gone out of box
-            done = True
-            reward = -5
+            done = True            
+            reward += 1000
+        elif (clipped_location != self._agent_location).any():  # An episode is done if the agent has gone out of box            
+            done = True            
+            reward -= 1500                        
         else:
             done = False
-            reward = 1 if distance < self._prev_distance else -1
-            reward = -1        
-        self._prev_distance = distance
-                        
-        observation = self._get_obs()
-        info = self._get_info()
-
+          
+        observation = self._get_obs()        
+        info = self._get_info()                        
+        
+        self._prev_distance = distance                
         return observation, reward, done, info
 
     def render(self, mode="human"):

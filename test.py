@@ -1,29 +1,59 @@
+from asyncore import read
+from sys import maxsize
 import time
 import gym
+from matplotlib.style import available
 import numpy as np
+import tensorflow as tf
 from gym_uav_collision_avoidance.envs import UAVWorld2D
-from stable_baselines3 import DDPG
-from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
+from ddpg import ddpg
+
 
 env = UAVWorld2D()
 
-# The noise objects for DDPG
 n_actions = env.action_space.shape[-1]
-action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
+total_episodes = 1000
+evaluate = False
 
-model = DDPG("MultiInputPolicy", env, action_noise=action_noise, verbose=1)
-model.learn(total_timesteps=10000, log_interval=10)
-model.save("ddpg_uav")
+agent = ddpg.Agent(input_dims=(5,), n_actions=n_actions, batch_size=256, fc1=700, fc2=600, alpha=0.0001, beta=0.0002)
 
-print('Done Training')
-env = model.get_env()
 
-del model # remove to demonstrate saving and loading
+for i in range(total_episodes):
+    observation = env.reset()
+    done = False
+    score = 0
+    time_steps = 0
+    print("episode = " + str(i))
+    while not done:
+        state = np.array([
+                    observation['normalized_agent_speed'][0],
+                    observation['normalized_agent_speed'][1],
+                    observation['normalized_target_relative_position'][0],
+                    observation['normalized_target_relative_position'][1],
+                    observation['normalized_delta_theta'],
+                ])    
+        action = agent.choose_action(state, evaluate)
+        action = action * env.action_space.high        
+        observation, reward, done, info = env.step(action)
+        new_state = np.array([
+                    observation['normalized_agent_speed'][0],
+                    observation['normalized_agent_speed'][1],
+                    observation['normalized_target_relative_position'][0],
+                    observation['normalized_target_relative_position'][1],
+                    observation['normalized_delta_theta'],
+                ])  
+        agent.remember(state, action, reward, new_state, done)
+        if not evaluate:                                
+            agent.learn()  
+        score += reward
+        time_steps += 1
+        # print(time_steps)
+        if time_steps > 1000:
+            done = True
+            print('Ending episode becauce timeout')
+        env.render()
+    agent.save_models() 
+    print('Ep = %d, Score = %.2f' % (i, score))
+        
 
-model = DDPG.load("ddpg_uav")
 
-obs = env.reset()
-while True:
-    action, _states = model.predict(obs)
-    obs, rewards, dones, info = env.step(action)
-    env.render()
