@@ -14,7 +14,7 @@ from gym_uav_collision_avoidance.envs.uav_agent import UAVAgent
 class MultiUAVWorld2D(gym.Env):
     metadata = {"render_fps": 1000}
 
-    def __init__(self, x_size=100.0, y_size=100.0, max_speed=12.0, max_acceleration=5.0, num_agents=4, collider_radius=0.5, d_sense=30):
+    def __init__(self, x_size=100.0, y_size=100.0, max_speed=12.0, max_acceleration=5.0, num_agents=4, collider_radius=2.5, d_sense=30):
         self.x_size = x_size # size of x dimension
         self.y_size = y_size # size of y dimension
         self.num_agents = num_agents
@@ -126,13 +126,10 @@ class MultiUAVWorld2D(gym.Env):
                         if np.linalg.norm(target_agent.target_location - current_agent.target_location) <= 2*self.collider_radius:
                             replicated = True                            
                             break
-
-        # Choose the goal's location uniformly at random
-        for i in range(self.num_agents):        
-            self.agent_list[i].target_location = np.random.uniform(self.min_location, high=self.max_location, size=(2,)).astype(np.float32)                
             self.agent_list[i].init_distance = np.linalg.norm(self.agent_list[i].target_location - self.agent_list[i].location)
             self.agent_list[i].prev_distance = self.agent_list[i].init_distance
-
+                 
+        
         
         self.steps = 0
 
@@ -150,17 +147,6 @@ class MultiUAVWorld2D(gym.Env):
         n_reward = []
         n_done = []        
         for i in range(self.num_agents):
-            clipped_location = np.clip(self.agent_list[i].location, self.min_location , self.max_location)
-            distance = np.linalg.norm(self.agent_list[i].target_location - self.agent_list[i].location)      
-
-            reward = 0 
-            reward -= 1 / self.agent_list[i].init_distance        
-            reward += 10 * (self.agent_list[i].prev_distance - distance)
-            delta_theta = math.atan2((self.agent_list[i].target_location - self.agent_list[i].location)[1],
-                (self.agent_list[i].target_location - self.agent_list[i].location)[0]) - math.atan2(self.agent_list[i].velocity[1],self.agent_list[i].velocity[0])
-            delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta))            
-            reward -= 0.1 * abs(delta_theta)
-
             # Check collision
             collision = False
             for j in range(self.num_agents):
@@ -170,15 +156,28 @@ class MultiUAVWorld2D(gym.Env):
                 if np.linalg.norm(target_agent.location - self.agent_list[i].location) <= 2 * self.collider_radius:
                     collision = True
 
+
+            max_speed = np.linalg.norm(self.agent_list[i].max_speed)
+            distance = np.linalg.norm(self.agent_list[i].target_location - self.agent_list[i].location)  
+            delta_theta = math.atan2((self.agent_list[i].target_location - self.agent_list[i].location)[1],
+                (self.agent_list[i].target_location - self.agent_list[i].location)[0]) - math.atan2(self.agent_list[i].velocity[1], self.agent_list[i].velocity[0])
+            delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta))                 
+            
+            reward = - max_speed / self.agent_list[i].init_distance
+            reward += 10 * ((self.agent_list[i].prev_distance - distance) / max_speed)
+            reward -= 0.1 * abs(delta_theta)
+            
+            if collision:
+                reward = -1            
+         
+            clipped_location = np.clip(self.agent_list[i].location, self.min_location , self.max_location)
+
             if distance < 0.5:  # An episode is done if the agent has reached the target        
                 done = True            
-                reward += 1000
+                reward += 100
             elif (clipped_location != self.agent_list[i].location).any():  # An episode is done if the agent has gone out of box            
                 done = True            
-                reward -= 1000
-            elif collision:
-                done = True
-                reward -= 2000        
+                reward -= 100            
             else:
                 done = False
             self.agent_list[i].prev_distance = distance  
@@ -216,12 +215,11 @@ class MultiUAVWorld2D(gym.Env):
                 canvas,
                 self.agent_list[i].color,
                 pygame.Rect(
-                    target_render_location,
+                    target_render_location - (object_render_size/2,object_render_size/2),
                     (object_render_size, object_render_size),
                 ),
             )
-            
-            
+
             # Now we draw the agent
             agent_render_location = (self.agent_list[i].location + np.array([self.x_size/2, self.y_size/2])) * pixel_per_meter 
             agent_render_location[1] = self.window_size_y - agent_render_location[1] 
@@ -235,6 +233,15 @@ class MultiUAVWorld2D(gym.Env):
             pygame.draw.line(canvas, (0, 0, 0), agent_render_location, 
                 agent_render_location+(object_render_size*math.cos(theta_v), object_render_size*math.sin(theta_v)),
                 width=3
+            )
+
+            # Draw collider
+            pygame.draw.circle(
+                canvas,
+                self.agent_list[i].color,
+                agent_render_location,
+                self.collider_radius*pixel_per_meter,
+                width=1
             )
         
         agent_render_location = (self.agent_list[0].location + np.array([self.x_size/2, self.y_size/2])) * pixel_per_meter 
@@ -252,6 +259,14 @@ class MultiUAVWorld2D(gym.Env):
             obs_render_location[1] = self.window_size_y - obs_render_location[1] 
             pygame.draw.line(canvas, (255, 0, 0), agent_render_location, 
                 obs_render_location,
+                width=1
+            )
+        
+        pygame.draw.circle(
+                canvas,
+                self.agent_list[0].color,
+                agent_render_location,
+                self.d_sense*pixel_per_meter,
                 width=1
             )
         

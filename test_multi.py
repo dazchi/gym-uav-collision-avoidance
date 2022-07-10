@@ -16,7 +16,7 @@ TF_LOG_DIR = './logs/DDPG/'
 TRAIN = True
 USE_NOISE = True
 SAVE_WEIGHTS = True
-TOTAL_EPISODES = 10000
+TOTAL_EPISODES = 3000
 WARM_UP_EPISODES = 3
 EPS_GREEDY = 0.95
 D_SENSE = 30
@@ -42,8 +42,7 @@ for ep in range(TOTAL_EPISODES):
     Q_loss.reset_states()
     A_loss.reset_states()    
     done = False
-    score = 0
-    time_steps = 0    
+    score = 0    
     while not done:        
         if not TRAIN:
             no_random_act = True    
@@ -57,12 +56,16 @@ for ep in range(TOTAL_EPISODES):
             n_cur_act.append(cur_act)
             n_cur_act_scaled.append(cur_act * env.action_space.high)
         n_state, n_reward, n_done, _ = env.step(n_cur_act_scaled)
+    
         # for i in range(NUM_AGENT):                               
         #     brain.remember(n_prev_state[i], n_reward[i], n_state[i], int(n_done[i]))        
         brain.remember(n_prev_state[0], n_cur_act[0], n_reward[0], n_state[0], int(n_done[0]))        
-        # print(n_state[0])
-
+        
         done = n_done[0]
+
+        if env.steps > 1000:
+            done = True
+
         # update weights
         if TRAIN:
             c, a = brain.learn(brain.buffer.get_batch(unbalance_p=UNBALANCE_P))
