@@ -13,11 +13,11 @@ env = MultiUAVWorld2D(num_agents=NUM_AGENT)
 # Training parameters, set others in common_definition.py
 CHECKPOINTS_PATH = "checkpoints/multi/DDPG_"
 TF_LOG_DIR = './logs/DDPG/'
-TRAIN = False
+TRAIN = True
 USE_NOISE = True
 SAVE_WEIGHTS = True
-TOTAL_EPISODES = 1000
-WARM_UP_EPISODES = 0
+TOTAL_EPISODES = 5000
+WARM_UP_EPISODES = 1
 EPS_GREEDY = 0.95
 
 brain = Brain(env.observation_space.shape[0], env.action_space.shape[0], 1, -1)
@@ -53,8 +53,7 @@ for ep in range(TOTAL_EPISODES):
         for i in range(NUM_AGENT):
             cur_act = brain.act(tf.expand_dims(n_prev_state[i], 0), _notrandom=no_random_act, noise=USE_NOISE and TRAIN and (i==0))                                                    
             n_cur_act.append(cur_act * env.action_space.high)
-        n_state, n_reward, n_done, _ = env.step(n_cur_act)
-
+        n_state, n_reward, n_done, _ = env.step(n_cur_act)        
         # for i in range(NUM_AGENT):                               
         #     brain.remember(n_prev_state[i], n_reward[i], n_state[i], int(n_done[i]))        
         brain.remember(n_prev_state[0], n_reward[0], n_state[0], int(n_done[0]))        

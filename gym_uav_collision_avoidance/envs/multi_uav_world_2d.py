@@ -14,7 +14,7 @@ from gym_uav_collision_avoidance.envs.uav_agent import UAVAgent
 class MultiUAVWorld2D(gym.Env):
     metadata = {"render_fps": 1000}
 
-    def __init__(self, x_size=100.0, y_size=100.0, num_agents=4, max_speed=12.0, max_acceleration=5.0):
+    def __init__(self, x_size=30.0, y_size=30.0, max_speed=12.0, max_acceleration=5.0, num_agents=4, collider_radius=0.5):
         self.x_size = x_size # size of x dimension
         self.y_size = y_size # size of y dimension
         self.num_agents = num_agents
@@ -28,7 +28,7 @@ class MultiUAVWorld2D(gym.Env):
         self.min_acceleratoin = np.array([-max_acceleration, -max_acceleration]) # Minimum speed of uav
         self.max_window_size = 800  # The size of the PyGame window
         self.tau = 0.02 # seconds between state updates
-        self.collider_radius = 0.5 # Size of the UAV collider
+        self.collider_radius = collider_radius # Size of the UAV collider
         if x_size > y_size:
             self.window_size_x = self.max_window_size
             self.window_size_y = self.max_window_size / x_size * y_size            
@@ -44,7 +44,7 @@ class MultiUAVWorld2D(gym.Env):
             self.agent_list.append(UAVAgent(color=color, max_speed=max_speed, max_acceleraion=max_acceleration, tau=self.tau))            
                 
                
-        self.observation_space = spaces.Box(-1, 1, shape=(4,), dtype=np.float32)       
+        self.observation_space = spaces.Box(-1, 1, shape=(12,), dtype=np.float32)       
         self.action_space = spaces.Box(-max_speed, max_speed, shape=(2,), dtype=np.float32)
 
         
@@ -61,17 +61,26 @@ class MultiUAVWorld2D(gym.Env):
     def _get_obs(self, agent):
         normalized_agent_speed = agent.velocity / agent.max_speed
         normalized_target_relative_position = (agent.target_location - agent.location) / self.map_diagonal_size
-        target_theta = math.atan2((agent.target_location - agent.location)[1],(agent.target_location - agent.location)[0])
-        agent_theta = math.atan2(agent.velocity[1], agent.velocity[0])    
-        delta_theta = target_theta - agent_theta
-        delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta)) 
-        normalized_delta_theta = delta_theta / math.pi
+
+        obstacles = agent.uavs_in_range(self.agent_list)
+        normalize_obstacle1_speed = (obstacles[0].velocity / agent.max_speed) if len(obstacles) > 0 else np.zeros(2)
+        normalized_obstacle1_relative_position = (obstacles[0].location - agent.location) / self.map_diagonal_size if len(obstacles) > 0 else np.ones(2)
+        normalize_obstacle2_speed = (obstacles[1].velocity / agent.max_speed) if len(obstacles) > 1 else np.zeros(2)
+        normalized_obstacle2_relative_position = (obstacles[1].location - agent.location) / self.map_diagonal_size if len(obstacles) > 1 else np.ones(2)
+    
 
         return np.array([normalized_agent_speed[0],
                          normalized_agent_speed[1],
                          normalized_target_relative_position[0],
                          normalized_target_relative_position[1],
-                        #  normalized_delta_theta
+                         normalize_obstacle1_speed[0],
+                         normalize_obstacle1_speed[1],
+                         normalized_obstacle1_relative_position[0],
+                         normalized_obstacle1_relative_position[1],
+                         normalize_obstacle2_speed[0],
+                         normalize_obstacle2_speed[1],
+                         normalized_obstacle2_relative_position[0],
+                         normalized_obstacle2_relative_position[1],                         
                         ])        
 
     def _get_info(self):
@@ -80,11 +89,42 @@ class MultiUAVWorld2D(gym.Env):
         }
 
     def reset(self, return_info=False, options=None):
-        # Choose the UoI's location uniformly at random
-        for i in range(self.num_agents):
-            self.agent_list[i].location = np.random.uniform(self.min_location, high=self.max_location, size=(2,)).astype(np.float32)
+        # Choose the UAV's location uniformly at random
+        self.agent_list[0].location = np.random.uniform(self.min_location, high=self.max_location, size=(2,)).astype(np.float32)
+        for i in range(self.num_agents - 1):                           
+            replicated = True
+            while replicated:
+                current_agent = self.agent_list[i+1]
+                current_agent.location = np.random.uniform(self.min_location, high=self.max_location, size=(2,)).astype(np.float32)
+                replicated = False
+                for j in range(i+1):
+                    target_agent = self.agent_list[j]
+                    if np.linalg.norm(target_agent.location - current_agent.location) <= 2*self.collider_radius:
+                        replicated = True                        
+                        break           
+
+        # Choose UAV's initial speed
+        for i in range(self.num_agents):            
             self.agent_list[i].velocity = np.random.uniform(self.min_speed, high=self.max_speed, size=(2,)).astype(np.float32)        
-            self.agent_list[i].velocity_prev = self.agent_list[i].velocity                    
+            self.agent_list[i].velocity_prev = self.agent_list[i].velocity
+            # self.agent_list[i].velocity = np.zeros(2)
+            # self.agent_list[i].velocity_prev = self.agent_list[i].velocity
+
+        # Choose the UAV's target location uniformly at random        
+        for i in range(self.num_agents):                           
+            replicated = True
+            while replicated:
+                current_agent = self.agent_list[i]
+                current_agent.target_location = np.random.uniform(self.min_location, high=self.max_location, size=(2,)).astype(np.float32)
+                replicated = False
+                if np.linalg.norm(current_agent.target_location - current_agent.location) <= 2*self.collider_radius:
+                    replicated = True
+                if i > 0:          
+                    for j in range(i):
+                        target_agent = self.agent_list[j]
+                        if np.linalg.norm(target_agent.target_location - current_agent.target_location) <= 2*self.collider_radius:
+                            replicated = True                            
+                            break
 
         # Choose the goal's location uniformly at random
         for i in range(self.num_agents):        
@@ -107,7 +147,7 @@ class MultiUAVWorld2D(gym.Env):
             self.agent_list[i].step(n_action[i])
         
         n_reward = []
-        n_done = []
+        n_done = []        
         for i in range(self.num_agents):
             clipped_location = np.clip(self.agent_list[i].location, self.min_location , self.max_location)
             distance = np.linalg.norm(self.agent_list[i].target_location - self.agent_list[i].location)      
@@ -120,12 +160,24 @@ class MultiUAVWorld2D(gym.Env):
             delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta))            
             reward -= 0.1 * abs(delta_theta)
 
+            # Check collision
+            collision = False
+            for j in range(self.num_agents):
+                target_agent = self.agent_list[j]
+                if self.agent_list[i] == target_agent:
+                    continue
+                if np.linalg.norm(target_agent.location - self.agent_list[i].location) <= 2 * self.collider_radius:
+                    collision = True
+
             if distance < 0.5:  # An episode is done if the agent has reached the target        
                 done = True            
                 reward += 1000
             elif (clipped_location != self.agent_list[i].location).any():  # An episode is done if the agent has gone out of box            
                 done = True            
-                reward -= 1500                        
+                reward -= 1000
+            elif collision:
+                done = True
+                reward -= 2000        
             else:
                 done = False
             self.agent_list[i].prev_distance = distance  
