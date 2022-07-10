@@ -16,9 +16,10 @@ TF_LOG_DIR = './logs/DDPG/'
 TRAIN = True
 USE_NOISE = True
 SAVE_WEIGHTS = True
-TOTAL_EPISODES = 5000
-WARM_UP_EPISODES = 1
+TOTAL_EPISODES = 10000
+WARM_UP_EPISODES = 5
 EPS_GREEDY = 0.95
+D_SENSE = 30
 
 brain = Brain(env.observation_space.shape[0], env.action_space.shape[0], 1, -1)
 # load weights if available
@@ -57,6 +58,7 @@ for ep in range(TOTAL_EPISODES):
         # for i in range(NUM_AGENT):                               
         #     brain.remember(n_prev_state[i], n_reward[i], n_state[i], int(n_done[i]))        
         brain.remember(n_prev_state[0], n_reward[0], n_state[0], int(n_done[0]))        
+        print(n_state[0])
 
         done = n_done[0]
         # update weights

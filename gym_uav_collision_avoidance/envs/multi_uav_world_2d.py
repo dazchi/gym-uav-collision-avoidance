@@ -14,7 +14,7 @@ from gym_uav_collision_avoidance.envs.uav_agent import UAVAgent
 class MultiUAVWorld2D(gym.Env):
     metadata = {"render_fps": 1000}
 
-    def __init__(self, x_size=30.0, y_size=30.0, max_speed=12.0, max_acceleration=5.0, num_agents=4, collider_radius=0.5):
+    def __init__(self, x_size=100.0, y_size=100.0, max_speed=12.0, max_acceleration=5.0, num_agents=4, collider_radius=0.5, d_sense=30):
         self.x_size = x_size # size of x dimension
         self.y_size = y_size # size of y dimension
         self.num_agents = num_agents
@@ -29,6 +29,7 @@ class MultiUAVWorld2D(gym.Env):
         self.max_window_size = 800  # The size of the PyGame window
         self.tau = 0.02 # seconds between state updates
         self.collider_radius = collider_radius # Size of the UAV collider
+        self.d_sense = d_sense # UAV Communication distance
         if x_size > y_size:
             self.window_size_x = self.max_window_size
             self.window_size_y = self.max_window_size / x_size * y_size            
@@ -62,7 +63,7 @@ class MultiUAVWorld2D(gym.Env):
         normalized_agent_speed = agent.velocity / agent.max_speed
         normalized_target_relative_position = (agent.target_location - agent.location) / self.map_diagonal_size
 
-        obstacles = agent.uavs_in_range(self.agent_list)
+        obstacles = agent.uavs_in_range(self.agent_list, self.d_sense)
         normalize_obstacle1_speed = (obstacles[0].velocity / agent.max_speed) if len(obstacles) > 0 else np.zeros(2)
         normalized_obstacle1_relative_position = (obstacles[0].location - agent.location) / self.map_diagonal_size if len(obstacles) > 0 else np.ones(2)
         normalize_obstacle2_speed = (obstacles[1].velocity / agent.max_speed) if len(obstacles) > 1 else np.zeros(2)
@@ -234,6 +235,24 @@ class MultiUAVWorld2D(gym.Env):
             pygame.draw.line(canvas, (0, 0, 0), agent_render_location, 
                 agent_render_location+(object_render_size*math.cos(theta_v), object_render_size*math.sin(theta_v)),
                 width=3
+            )
+        
+        agent_render_location = (self.agent_list[0].location + np.array([self.x_size/2, self.y_size/2])) * pixel_per_meter 
+        agent_render_location[1] = self.window_size_y - agent_render_location[1] 
+        uav_in_range = self.agent_list[0].uavs_in_range(self.agent_list)
+        if len(uav_in_range)>0:            
+            obs_render_location = (uav_in_range[0].location + np.array([self.x_size/2, self.y_size/2])) * pixel_per_meter 
+            obs_render_location[1] = self.window_size_y - obs_render_location[1] 
+            pygame.draw.line(canvas, (255, 0, 0), agent_render_location, 
+                obs_render_location,
+                width=1
+            )
+        if len(uav_in_range)>1:            
+            obs_render_location = (uav_in_range[1].location + np.array([self.x_size/2, self.y_size/2])) * pixel_per_meter 
+            obs_render_location[1] = self.window_size_y - obs_render_location[1] 
+            pygame.draw.line(canvas, (255, 0, 0), agent_render_location, 
+                obs_render_location,
+                width=1
             )
         
         if mode == "human":
