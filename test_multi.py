@@ -1,18 +1,17 @@
-from asyncore import read
-from sys import maxsize
 import random
 from matplotlib.style import available
 import numpy as np
 import tensorflow as tf
-from gym_uav_collision_avoidance.envs import UAVWorld2D
+from gym_uav_collision_avoidance.envs import MultiUAVWorld2D
 from ddpg_tf2.model import Brain
 from ddpg_tf2.common_definitions import UNBALANCE_P
 from ddpg_tf2.utils import Tensorboard
 
-env = UAVWorld2D()
+NUM_AGENT = 10
+env = MultiUAVWorld2D(num_agents=NUM_AGENT)
 
 # Training parameters, set others in common_definition.py
-CHECKPOINTS_PATH = "checkpoints/DDPG_"
+CHECKPOINTS_PATH = "checkpoints/multi/DDPG_"
 TF_LOG_DIR = './logs/DDPG/'
 TRAIN = False
 USE_NOISE = True
@@ -35,7 +34,7 @@ A_loss = tf.keras.metrics.Mean('A_loss', dtype=tf.float32)
 
 
 for ep in range(TOTAL_EPISODES):
-    prev_state = env.reset()
+    n_prev_state = env.reset()
     brain.noise.reset()
     acc_reward.reset_states()
     actions_squared.reset_states()
@@ -48,20 +47,28 @@ for ep in range(TOTAL_EPISODES):
         if not TRAIN:
             no_random_act = True    
         else:
-            no_random_act = (ep >= WARM_UP_EPISODES) and (random.random() < EPS_GREEDY+(1-EPS_GREEDY)*ep/TOTAL_EPISODES)
-        cur_act = brain.act(tf.expand_dims(prev_state, 0), _notrandom=no_random_act, noise=USE_NOISE and TRAIN)
-        state, reward, done, _ = env.step(cur_act * env.action_space.high)
-        brain.remember(prev_state, reward, state, int(done))
+            no_random_act = (ep >= WARM_UP_EPISODES) and (random.random() < EPS_GREEDY+(1-EPS_GREEDY)*ep/TOTAL_EPISODES)     
+        
+        n_cur_act = []
+        for i in range(NUM_AGENT):
+            cur_act = brain.act(tf.expand_dims(n_prev_state[i], 0), _notrandom=no_random_act, noise=USE_NOISE and TRAIN and (i==0))                                                    
+            n_cur_act.append(cur_act * env.action_space.high)
+        n_state, n_reward, n_done, _ = env.step(n_cur_act)
 
+        # for i in range(NUM_AGENT):                               
+        #     brain.remember(n_prev_state[i], n_reward[i], n_state[i], int(n_done[i]))        
+        brain.remember(n_prev_state[0], n_reward[0], n_state[0], int(n_done[0]))        
+
+        done = n_done[0]
         # update weights
         if TRAIN:
             c, a = brain.learn(brain.buffer.get_batch(unbalance_p=UNBALANCE_P))
             Q_loss(c)
             A_loss(a)
-        acc_reward(reward)
-        actions_squared(np.square(cur_act))
-        score += reward
-        prev_state = state        
+        acc_reward(n_reward[0])
+        actions_squared(np.square(n_cur_act[0]))
+        score += n_reward[0]
+        n_prev_state = n_state                
         env.render()
         tensorboard(ep, acc_reward, actions_squared, Q_loss, A_loss)
     if TRAIN:

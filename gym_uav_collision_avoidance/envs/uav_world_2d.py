@@ -51,7 +51,7 @@ class UAVWorld2D(gym.Env):
         #     }
         # )
 
-        self.observation_space = spaces.Box(-1, 1, shape=(5,), dtype=np.float32)
+        self.observation_space = spaces.Box(-1, 1, shape=(4,), dtype=np.float32)
 
         # We have 4 actions, corresponding to "right", "up", "left", "down", "right"
         # self.action_space = spaces.Dict(
@@ -101,8 +101,8 @@ class UAVWorld2D(gym.Env):
                          normalized_agent_speed[1],
                          normalized_target_relative_position[0],
                          normalized_target_relative_position[1],
-                         normalized_delta_theta]
-                        )
+                        #  normalized_delta_theta
+                        ])
 
     def _get_info(self):
         return {
@@ -137,8 +137,8 @@ class UAVWorld2D(gym.Env):
         dx = self._agent_speed * self.tau        
         self._agent_location += dx
         self._agent_speed_prev = self._agent_speed
+        
         clipped_location = np.clip(self._agent_location, self.min_location , self.max_location)
-
         distance = np.linalg.norm(self._target_location - self._agent_location)      
 
         reward = 0 

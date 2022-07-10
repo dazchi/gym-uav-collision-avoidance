@@ -58,3 +58,6 @@ docs/_build/
 # Models
 *.zip
 weights/
+
+# Logs
+logs/
