@@ -36,6 +36,13 @@ class UAVAgent():
                 relative_distances.append(distance)
         
         # Sort UAVs with relative distances 
-        return [x for _,x in sorted(zip(relative_distances,uavs))] if len(uavs) > 0 else []
+        if len(uavs) == 0:
+            return []
+        else:
+            uavs = np.array(uavs)
+            relative_distances = np.array(relative_distances)
+            inds = relative_distances.argsort()
+            sorted_uavs = uavs[inds]
+        return sorted_uavs.tolist()
         
        

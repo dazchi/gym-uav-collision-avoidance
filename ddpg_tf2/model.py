@@ -183,12 +183,12 @@ class Brain:
 
         return self.cur_action
 
-    def remember(self, prev_state, reward, state, done):
+    def remember(self, prev_state, action, reward, state, done):
         """
         Store states, reward, done value to the buffer
         """
         # record it in the buffer based on its reward
-        self.buffer.append(prev_state, self.cur_action, reward, state, done)
+        self.buffer.append(prev_state, action, reward, state, done)
 
     def learn(self, entry):
         """
