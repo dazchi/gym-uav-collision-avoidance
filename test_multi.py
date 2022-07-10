@@ -61,6 +61,7 @@ for ep in range(TOTAL_EPISODES):
         #     brain.remember(n_prev_state[i], n_reward[i], n_state[i], int(n_done[i]))        
         brain.remember(n_prev_state[0], n_cur_act[0], n_reward[0], n_state[0], int(n_done[0]))        
         
+        print('reward = %f' % n_reward[0], end='\r')
         done = n_done[0]
 
         if env.steps > 1000:

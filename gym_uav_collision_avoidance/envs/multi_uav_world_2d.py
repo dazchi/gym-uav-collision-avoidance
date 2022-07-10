@@ -2,6 +2,7 @@ from cmath import cos, pi
 import math
 import colorsys
 from random import randrange
+import re
 from turtle import position
 from cv2 import normalize, resizeWindow
 import gym
@@ -162,13 +163,19 @@ class MultiUAVWorld2D(gym.Env):
             delta_theta = math.atan2((self.agent_list[i].target_location - self.agent_list[i].location)[1],
                 (self.agent_list[i].target_location - self.agent_list[i].location)[0]) - math.atan2(self.agent_list[i].velocity[1], self.agent_list[i].velocity[0])
             delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta))                 
-            
-            reward = - max_speed / self.agent_list[i].init_distance
-            reward += 10 * ((self.agent_list[i].prev_distance - distance) / max_speed)
-            reward -= 0.1 * abs(delta_theta)
+                                    
+            reward = 0
+            reward += 20 * ((self.agent_list[i].prev_distance - distance) / max_speed)
+            if reward > 0:
+                reward *= 1 - (distance/(1.5*self.agent_list[i].init_distance))
+            else:
+                reward *= 1 + (distance/(1.5*self.agent_list[i].init_distance))
+            reward -= 0.01 * abs(delta_theta)
             
             if collision:
-                reward = -1            
+                reward = -1        
+
+            reward -= 0.01    
          
             clipped_location = np.clip(self.agent_list[i].location, self.min_location , self.max_location)
 
@@ -180,6 +187,7 @@ class MultiUAVWorld2D(gym.Env):
                 reward -= 100            
             else:
                 done = False
+            
             self.agent_list[i].prev_distance = distance  
             n_reward.append(reward)
             n_done.append(done)
