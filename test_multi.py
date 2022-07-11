@@ -1,4 +1,5 @@
 import random
+import time
 from matplotlib.style import available
 import numpy as np
 import tensorflow as tf
@@ -43,6 +44,7 @@ for ep in range(TOTAL_EPISODES):
     A_loss.reset_states()    
     done = False
     score = 0    
+    ep_start_time = time.time()
     while not done:        
         if not TRAIN:
             no_random_act = True    
@@ -58,10 +60,15 @@ for ep in range(TOTAL_EPISODES):
         n_state, n_reward, n_done, _ = env.step(n_cur_act_scaled)
     
         # for i in range(NUM_AGENT):                               
-        #     brain.remember(n_prev_state[i], n_reward[i], n_state[i], int(n_done[i]))        
+        #     if n_done[i]: 
+        #         continue
+        #     brain.remember(n_prev_state[i], n_cur_act[i], n_reward[i], n_state[i], int(n_done[i]))        
+        
         brain.remember(n_prev_state[0], n_cur_act[0], n_reward[0], n_state[0], int(n_done[0]))        
         
-        print('reward = %f' % n_reward[0], end='\r')
+        print('t = %d, reward = %f' % (env.steps, n_reward[0]), end='\r')
+        # print(n_state[0])
+        
         done = n_done[0]
 
         if env.steps > 1000:
@@ -78,9 +85,12 @@ for ep in range(TOTAL_EPISODES):
         n_prev_state = n_state                
         env.render()
         tensorboard(ep, acc_reward, actions_squared, Q_loss, A_loss)
+    
     if TRAIN:
         brain.save_weights(CHECKPOINTS_PATH)
-    print('Ep = %d, Score = %.2f' % (ep, score))
+    
+    steps_per_second = env.steps / (time.time() - ep_start_time)
+    print('Ep = %d, Score = %.2f, steps_per_second %.2f' % (ep, score ,steps_per_second))
         
 
 

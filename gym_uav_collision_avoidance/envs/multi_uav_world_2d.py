@@ -66,9 +66,9 @@ class MultiUAVWorld2D(gym.Env):
 
         obstacles = agent.uavs_in_range(self.agent_list, self.d_sense)
         normalize_obstacle1_speed = (obstacles[0].velocity / agent.max_speed) if len(obstacles) > 0 else np.zeros(2)
-        normalized_obstacle1_relative_position = (obstacles[0].location - agent.location) / self.map_diagonal_size if len(obstacles) > 0 else np.ones(2)
+        normalized_obstacle1_relative_position = (obstacles[0].location - agent.location) / self.d_sense if len(obstacles) > 0 else np.ones(2)
         normalize_obstacle2_speed = (obstacles[1].velocity / agent.max_speed) if len(obstacles) > 1 else np.zeros(2)
-        normalized_obstacle2_relative_position = (obstacles[1].location - agent.location) / self.map_diagonal_size if len(obstacles) > 1 else np.ones(2)
+        normalized_obstacle2_relative_position = (obstacles[1].location - agent.location) / self.d_sense if len(obstacles) > 1 else np.ones(2)
     
 
         return np.array([normalized_agent_speed[0],
