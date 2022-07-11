@@ -12,7 +12,7 @@ env = UAVWorld2D()
 # Training parameters, set others in common_definition.py
 CHECKPOINTS_PATH = "checkpoints/DDPG_"
 TF_LOG_DIR = './logs/DDPG/'
-TRAIN = False
+TRAIN = True
 USE_NOISE = True
 SAVE_WEIGHTS = True
 TOTAL_EPISODES = 1000
@@ -49,7 +49,7 @@ for ep in range(TOTAL_EPISODES):
             no_random_act = (ep >= WARM_UP_EPISODES) and (random.random() < EPS_GREEDY+(1-EPS_GREEDY)*ep/TOTAL_EPISODES)       
         cur_act = brain.act(tf.expand_dims(prev_state, 0), _notrandom=no_random_act, noise=USE_NOISE and TRAIN)                        
         state, reward, done, _ = env.step(cur_act * env.action_space.high)        
-        brain.remember(prev_state, reward, state, int(done))        
+        brain.remember(prev_state, cur_act, reward, state, int(done))        
 
         # update weights
         if TRAIN:
@@ -62,6 +62,7 @@ for ep in range(TOTAL_EPISODES):
         prev_state = state                
         env.render()
         tensorboard(ep, acc_reward, actions_squared, Q_loss, A_loss)
+        print('Reward = %.3f' % reward, end='\r')
     if TRAIN:
         brain.save_weights(CHECKPOINTS_PATH)
     print('Ep = %d, Score = %.2f' % (ep, score))

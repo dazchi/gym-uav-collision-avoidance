@@ -32,7 +32,7 @@ def ActorNetwork(num_states=24, num_actions=4, action_high=1):
     out = tf.keras.layers.Dense(600, activation=tf.nn.leaky_relu,
                                 kernel_initializer=KERNEL_INITIALIZER)(inputs)
     out = tf.keras.layers.Dense(300, activation=tf.nn.leaky_relu,
-                                kernel_initializer=KERNEL_INITIALIZER)(out)
+                                kernel_initializer=KERNEL_INITIALIZER)(out)                               
     outputs = tf.keras.layers.Dense(num_actions, activation="tanh", kernel_initializer=last_init)(
         out) * action_high
 
@@ -161,7 +161,7 @@ class Brain:
             return critic_loss, actor_loss
 
         self.update_weights = update_weights
-
+    
     def act(self, state, _notrandom=True, noise=True):
         """
         Run action by the actor network

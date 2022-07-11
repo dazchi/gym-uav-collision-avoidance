@@ -9,7 +9,14 @@ from ddpg_tf2.model import Brain
 from ddpg_tf2.common_definitions import UNBALANCE_P
 from ddpg_tf2.utils import Tensorboard
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+  try:
+    for gpu in gpus:
+      tf.config.experimental.set_memory_growth(gpu, True)
+  except RuntimeError as e:
+    print(e)
 
 NUM_AGENT = 10
 env = MultiUAVWorld2D(num_agents=NUM_AGENT)
@@ -21,7 +28,7 @@ TRAIN = True
 USE_NOISE = True
 SAVE_WEIGHTS = True
 TOTAL_EPISODES = 3000
-WARM_UP_EPISODES = 3
+WARM_UP_EPISODES = 1
 EPS_GREEDY = 0.95
 D_SENSE = 30
 
@@ -47,8 +54,9 @@ for ep in range(TOTAL_EPISODES):
     A_loss.reset_states()    
     done = False
     score = 0    
-    ep_start_time = time.time()
+    ep_start_time = time.time()    
     while not done:        
+        tt = time.time()
         if not TRAIN:
             no_random_act = True    
         else:
@@ -57,20 +65,20 @@ for ep in range(TOTAL_EPISODES):
         n_cur_act = []
         n_cur_act_scaled = []
         for i in range(NUM_AGENT):
-            cur_act = brain.act(tf.expand_dims(n_prev_state[i], 0), _notrandom=no_random_act, noise=USE_NOISE and TRAIN and (i==0))                                                    
+            t1 = time.time()
+            cur_act = brain.act(tf.expand_dims(n_prev_state[i], 0), _notrandom=no_random_act, noise=USE_NOISE and TRAIN and (i==0))                 
+            t1 = time.time()-t1
             n_cur_act.append(cur_act)
             n_cur_act_scaled.append(cur_act * env.action_space.high)
         n_state, n_reward, n_done, _ = env.step(n_cur_act_scaled)
     
-        # for i in range(NUM_AGENT):                               
-        #     if n_done[i]: 
+        brain.remember(n_prev_state[0], n_cur_act[0], n_reward[0], n_state[0], int(n_done[0]))     
+        
+        # for i in range(NUM_AGENT -1):                               
+        #     if n_done[i+1]: 
         #         continue
-        #     brain.remember(n_prev_state[i], n_cur_act[i], n_reward[i], n_state[i], int(n_done[i]))        
-        
-        brain.remember(n_prev_state[0], n_cur_act[0], n_reward[0], n_state[0], int(n_done[0]))        
-        
-        print('t = %d, reward = %f' % (env.steps, n_reward[0]), end='\r')
-        # print(n_state[0])
+        #     brain.remember(n_prev_state[i+1], n_cur_act[i+1], n_reward[i+1], n_state[i+1], int(n_done[i+1]))        
+                                   
         
         done = n_done[0]
 
@@ -79,15 +87,22 @@ for ep in range(TOTAL_EPISODES):
 
         # update weights
         if TRAIN:
-            c, a = brain.learn(brain.buffer.get_batch(unbalance_p=UNBALANCE_P))
+            t2 = time.time()
+            c, a = brain.learn(brain.buffer.get_batch(unbalance_p=UNBALANCE_P))            
+            t2 = time.time() - t2
             Q_loss(c)
             A_loss(a)
+        
         acc_reward(n_reward[0])
         actions_squared(np.square(n_cur_act[0]))
         score += n_reward[0]
-        n_prev_state = n_state                
-        env.render()
+        n_prev_state = n_state        
         tensorboard(ep, acc_reward, actions_squared, Q_loss, A_loss)
+
+        
+        env.render()
+        print('t = %d, reward = %.2f, t1 = %.4f, t2 = %.4f, tt = %.4f' % (env.steps, n_reward[0], t1, t2, time.time()-tt), end='\r')
+        
     
     if TRAIN:
         brain.save_weights(CHECKPOINTS_PATH)

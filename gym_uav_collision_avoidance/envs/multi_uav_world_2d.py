@@ -173,7 +173,7 @@ class MultiUAVWorld2D(gym.Env):
             reward -= 0.01 * abs(delta_theta)
             
             if collision:
-                reward = -1        
+                reward = -10
 
             reward -= 0.01    
          
