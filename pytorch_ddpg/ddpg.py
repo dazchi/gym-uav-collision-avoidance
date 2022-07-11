@@ -31,7 +31,7 @@ class DDPG(object):
         self.noise =  OUActionNoise(mean=np.zeros(1), std_deviation=float(noise_std_dev) * np.ones(1))
         self.tau = tau  # Target network update rate
         self.gamma = gamma  # Reward discount
-
+       
     # 
         if USE_CUDA: self._cuda()
     
@@ -61,7 +61,7 @@ class DDPG(object):
             next_state_batch, done_batch = zip(*batch)
   
         state_batch = self._to_tensor(np.asarray(state_batch))
-        action_batch = self._to_tensor(np.asarray(action_batch))
+        action_batch = self._to_tensor(np.asarray(action_batch))        
         reward_batch = self._to_tensor(np.asarray(reward_batch))
         next_state_batch = self._to_tensor(np.asarray(next_state_batch), volatile=True)
         done_batch = self._to_tensor(np.asarray(done_batch))
@@ -72,23 +72,22 @@ class DDPG(object):
         q = self.critic(state_batch, action_batch)
         
         self.critic.zero_grad()
-        loss_function = nn.MSELoss()
+        # loss_function = nn.MSELoss()
         loss_function = nn.L1Loss()     # Mean Absolute Loss                
         critic_loss = loss_function(y, q)
         critic_loss.backward()
-        self.critic_optimizer.step()
+        self.critic_optimizer.step()        
 
         # Update actor network
         self.actor.zero_grad()
-
-        policy_loss = -self.critic(state_batch, self.actor(state_batch))
-        policy_loss = policy_loss.mean()
-        policy_loss.backward()
+        actor_loss = -self.critic(state_batch, self.actor(state_batch))
+        actor_loss = actor_loss.mean()
+        actor_loss.backward()
         self.actor_optimizer.step()
+        
                 
         self._soft_update(self.actor, self.actor_target, self.tau)
-        self._soft_update(self.critic, self.critic_target, self.tau)
-        pass
+        self._soft_update(self.critic, self.critic_target, self.tau)        
 
     def eval(self):
         self.actor.eval()
