@@ -1,5 +1,6 @@
 import random
 import time
+import os
 from matplotlib.style import available
 import numpy as np
 import tensorflow as tf
@@ -7,6 +8,8 @@ from gym_uav_collision_avoidance.envs import MultiUAVWorld2D
 from ddpg_tf2.model import Brain
 from ddpg_tf2.common_definitions import UNBALANCE_P
 from ddpg_tf2.utils import Tensorboard
+
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 NUM_AGENT = 10
 env = MultiUAVWorld2D(num_agents=NUM_AGENT)
