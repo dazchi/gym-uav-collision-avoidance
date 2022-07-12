@@ -27,8 +27,8 @@ class DDPG(object):
         self.critic_target = CriticNetwork(self.n_states, self.n_actions)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=critic_lr, amsgrad=True)
 
-        self._hard_update(self.actor, self.actor_target)
-        self._hard_update(self.critic, self.critic_target)
+        DDPG._hard_update(self.actor, self.actor_target)
+        DDPG._hard_update(self.critic, self.critic_target)
 
         self.buffer = ReplayBuffer(buffer_size, batch_size)
         self.noise =  OUActionNoise(mean=np.zeros(1), std_deviation=float(noise_std_dev) * np.ones(1))
@@ -46,9 +46,9 @@ class DDPG(object):
         if random_act:
             action = np.random.uniform(-1*np.ones(self.n_actions), np.ones(self.n_actions), self.n_actions)
         else:
-            state = self._to_tensor(state, volatile=True, requires_grad=False).unsqueeze(0)                 
+            state = DDPG._to_tensor(state, volatile=True, requires_grad=False).unsqueeze(0)                 
             action = self.actor(state)
-            action = self._to_numpy(action).squeeze(0)            
+            action = DDPG._to_numpy(action).squeeze(0)            
 
         action += self.noise() if noise else 0        
         action = np.clip(action, -1., 1.)
@@ -72,56 +72,33 @@ class DDPG(object):
         action_batch = torch.stack(action_batch)   
         reward_batch = torch.stack(reward_batch)
         next_state_batch = torch.stack(next_state_batch)
-        done_batch = torch.stack(done_batch)                
-                
-        scaler = torch.cuda.amp.grad_scaler.GradScaler()         
+        done_batch = torch.stack(done_batch)                   
 
+      
+                    
+        # Update critic network
+        y = reward_batch + self.gamma * (1 - done_batch) * self.critic_target(next_state_batch, self.actor_target(next_state_batch))                   
+        q = self.critic(state_batch, action_batch)        
+        # self.critic.zero_grad(set_to_none=True)
         for param in self.critic.parameters():
             param.grad = None
-
-        for param in self.actor.parameters():
-            param.grad = None      
-
-        with amp.autocast(enabled=USE_CUDA):
-            y = reward_batch + self.gamma * (1 - done_batch) * self.critic_target(next_state_batch, self.actor_target(next_state_batch))                   
-            q = self.critic(state_batch, action_batch)        
-            loss_function = nn.L1Loss()
-            critic_loss = loss_function(y, q)
-
-        with amp.autocast(enabled=USE_CUDA):
-            actor_loss = -self.critic(state_batch, self.actor(state_batch))          
-            actor_loss = actor_loss.mean()     
-
-                      
-        scaler.scale(critic_loss).backward()
-        scaler.scale(actor_loss).backward()
-        scaler.step(self.critic_optimizer)
-        scaler.step(self.actor_optimizer)
-                 
-        # Update critic network
-        # y = reward_batch + self.gamma * (1 - done_batch) * self.critic_target(next_state_batch, self.actor_target(next_state_batch))                   
-        # q = self.critic(state_batch, action_batch)        
-        # self.critic.zero_grad(set_to_none=True)
-        # for param in self.critic.parameters():
-        #     param.grad = None
-        # loss_function = nn.MSELoss()
-        # loss_function = nn.L1Loss()     # Mean Absolute Loss                
-        # critic_loss = loss_function(y, q)
-        # critic_loss.backward()
-        # self.critic_optimizer.step()        
+        loss_function = nn.MSELoss()
+        loss_function = nn.L1Loss()     # Mean Absolute Loss                
+        critic_loss = loss_function(y, q)
+        critic_loss.backward()
+        self.critic_optimizer.step()        
 
         # Update actor network
         # self.actor.zero_grad(set_to_none=True)
-        # for param in self.actor.parameters():
-        #     param.grad = None
-
-        # actor_loss = -self.critic(state_batch, self.actor(state_batch))
-        # actor_loss = actor_loss.mean()
-        # actor_loss.backward()        
-        # self.actor_optimizer.step()
+        for param in self.actor.parameters():
+            param.grad = None
+        actor_loss = -self.critic(state_batch, self.actor(state_batch))
+        actor_loss = actor_loss.mean()
+        actor_loss.backward()        
+        self.actor_optimizer.step()
                         
-        self._soft_update(self.actor, self.actor_target, self.tau)
-        self._soft_update(self.critic, self.critic_target, self.tau)                 
+        DDPG._soft_update(self.actor, self.actor_target, self.tau)
+        DDPG._soft_update(self.critic, self.critic_target, self.tau)                 
 
         state_batch = state_batch.detach().cpu()
         action_batch = action_batch.detach().cpu()

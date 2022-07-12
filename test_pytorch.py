@@ -73,9 +73,9 @@ for eps in range(TOTAL_EPISODES):
         action = ddpg.choose_action(state, random_action and not EVALUATE, noise=not EVALUATE)        
         v = (action[0]+1)/2 * np.linalg.norm(env.action_space.high)        
         theta = action[1] * math.pi
-        scaled_action = np.array([v*math.cos(theta), v*math.sin(theta)])
+        converted_action = np.array([v*math.cos(theta), v*math.sin(theta)])
         
-        new_state, reward, done, info = env.step(action * env.action_space.high)                        
+        new_state, reward, done, info = env.step(converted_action)                        
                 
         ddpg.remember(state, action, reward, new_state, done)                
 
