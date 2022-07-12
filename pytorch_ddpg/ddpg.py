@@ -27,8 +27,8 @@ class DDPG(object):
         self.critic_target = CriticNetwork(self.n_states, self.n_actions)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=critic_lr, amsgrad=True)
 
-        DDPG._hard_update(self.actor, self.actor_target)
-        DDPG._hard_update(self.critic, self.critic_target)
+        self._hard_update(self.actor, self.actor_target)
+        self._hard_update(self.critic, self.critic_target)
 
         self.buffer = ReplayBuffer(buffer_size, batch_size)
         self.noise =  OUActionNoise(mean=np.zeros(1), std_deviation=float(noise_std_dev) * np.ones(1))
@@ -43,12 +43,13 @@ class DDPG(object):
         self.buffer.append(prev_state, action, reward, state, done)        
     
     def choose_action(self, state, random_act=False, noise=True):
+        self.actor.eval()
         if random_act:
             action = np.random.uniform(-1*np.ones(self.n_actions), np.ones(self.n_actions), self.n_actions)
         else:
-            state = DDPG._to_tensor(state, volatile=True, requires_grad=False).unsqueeze(0)                 
+            state = self._to_tensor(state, volatile=True, requires_grad=False).unsqueeze(0)                 
             action = self.actor(state)
-            action = DDPG._to_numpy(action).squeeze(0)            
+            action = self._to_numpy(action).squeeze(0)            
 
         action += self.noise() if noise else 0        
         action = np.clip(action, -1., 1.)
@@ -57,6 +58,7 @@ class DDPG(object):
 
 
     def learn(self):
+        self.actor.train()
         batch = self.buffer.get_batch(unbalance_p=UNBALANCE_P)
                 
         state_batch, action_batch, reward_batch, \
@@ -97,8 +99,8 @@ class DDPG(object):
         actor_loss.backward()        
         self.actor_optimizer.step()
                         
-        DDPG._soft_update(self.actor, self.actor_target, self.tau)
-        DDPG._soft_update(self.critic, self.critic_target, self.tau)                 
+        self._soft_update(self.actor, self.actor_target, self.tau)
+        self._soft_update(self.critic, self.critic_target, self.tau)                 
 
         state_batch = state_batch.detach().cpu()
         action_batch = action_batch.detach().cpu()
@@ -162,21 +164,21 @@ class DDPG(object):
         self.critic.cuda()
         self.critic_target.cuda()
 
-    @staticmethod
-    def _hard_update(source, target):
+
+    def _hard_update(self, source, target):
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(param.data)
 
-    @staticmethod
-    def _soft_update(source, target, tau):
+
+    def _soft_update(self, source, target, tau):
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(
                 target_param.data * (1.0 - tau) + param.data * tau
             )
         pass
 
-    @staticmethod
-    def _to_tensor(ndarray, volatile=False, requires_grad=False, dtype=FLOAT):
+
+    def _to_tensor(self, ndarray, volatile=False, requires_grad=False, dtype=FLOAT):
         if volatile:
             with torch.no_grad():
                 return Variable(
@@ -187,8 +189,8 @@ class DDPG(object):
                     torch.from_numpy(ndarray), requires_grad=requires_grad
                 ).type(dtype)        
         
-    @staticmethod
-    def _to_numpy(var):
+
+    def _to_numpy(self, var):
         return var.detach().cpu().data.numpy() if USE_CUDA else var.data.numpy()
     
    

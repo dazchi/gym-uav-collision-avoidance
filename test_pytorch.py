@@ -17,10 +17,10 @@ torch.autograd.profiler.profile(False)
 torch.autograd.profiler.emit_nvtx(False)
 
 MODEL_PATH = './weights/ddpg'
-WARM_UP_STEPS = 1000
+WARM_UP_STEPS = 5000
 MAX_EPISOED_STEPS = 3000
 TOTAL_EPISODES = 1000
-EVALUATE = False
+EVALUATE = True
 LOAD_MODEL = False
 
 EPSILON_GREEDY = 0.95
@@ -75,7 +75,7 @@ for eps in range(TOTAL_EPISODES):
         theta = action[1] * math.pi
         converted_action = np.array([v*math.cos(theta), v*math.sin(theta)])
         
-        new_state, reward, done, info = env.step(converted_action)                        
+        new_state, reward, done, info = env.step(action * env.action_space.high)                        
                 
         ddpg.remember(state, action, reward, new_state, done)                
 

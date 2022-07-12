@@ -17,7 +17,7 @@ torch.autograd.profiler.profile(False)
 torch.autograd.profiler.emit_nvtx(False)
 
 MODEL_PATH = './weights/ddpg_multi'
-WARM_UP_STEPS = 1000
+WARM_UP_STEPS = 3000
 MAX_EPISOED_STEPS = 3000
 TOTAL_EPISODES = 1000
 EVALUATE = False
@@ -39,10 +39,10 @@ tb_writer = SummaryWriter()
 n_observations = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
 
-
-ddpg_agents = []
-for i in range(NUM_AGENTS):
-    ddpg_agents.append(DDPG(n_observations, n_actions))
+ddpg = DDPG(n_observations, n_actions)
+# ddpg_agents = []
+# for i in range(NUM_AGENTS):
+#     ddpg_agents.append(DDPG(n_observations, n_actions))
 
 # o = torch.zeros(2,n_observations, dtype=torch.float, requires_grad=False, device=device)
 # a = torch.zeros(2,n_actions, dtype=torch.float, requires_grad=False, device=device)
@@ -52,15 +52,12 @@ for i in range(NUM_AGENTS):
 # make_dot(x, params=dict(list(ddpg.critic.named_parameters()))).render("critic_network", format="png")
 
 if EVALUATE or LOAD_MODEL:    
-    for i in range(NUM_AGENTS):
-        ddpg_agents[i].load_weights(MODEL_PATH)
+    ddpg.load_weights(MODEL_PATH)
 
 if EVALUATE:
-    for i in range(NUM_AGENTS):
-        ddpg_agents[i].eval()
+    ddpg.eval()
 else:
-    for i in range(NUM_AGENTS):
-        ddpg_agents[i].train()
+    ddpg.train()
 
 n_state, _ = env.reset(return_info=True)
 total_steps = 0
@@ -72,21 +69,25 @@ for eps in range(TOTAL_EPISODES):
     for steps in range(MAX_EPISOED_STEPS):
         random_action = (not LOAD_MODEL and (total_steps < WARM_UP_STEPS)) or (random.random() > EPSILON_GREEDY + (1-EPSILON_GREEDY)*eps/TOTAL_EPISODES) 
         n_action = []
-        n_action_converted = []
+        n_action_scaled= []
         for i in range(NUM_AGENTS):
-            action = ddpg_agents[i].choose_action(n_state[i], random_action and not EVALUATE, noise=not EVALUATE)
+            action = ddpg.choose_action(n_state[i], random_action and not EVALUATE, noise=not EVALUATE and i==0)
             n_action.append(action)
-            v = (action[0]+1)/2 * np.linalg.norm(env.action_space.high)
-            theta = action[1] * math.pi
-            converted_action = np.array([v*math.cos(theta), v*math.sin(theta)])
-            n_action_converted.append(converted_action)
+            # v = (action[0]+1)/2 * np.linalg.norm(env.action_space.high)
+            # theta = action[1] * math.pi
+            # converted_action = np.array([v*math.cos(theta), v*math.sin(theta)])
+            n_action_scaled.append(action * env.action_space.high)
                 
-        n_new_state, n_reward, n_done, _ = env.step(n_action_converted)              
+        n_new_state, n_reward, n_done, _ = env.step(n_action_scaled)              
 
-        ddpg_agents[0].remember(n_state[0], n_action[0], n_reward[0], n_new_state[i], n_done[i])                
+        ddpg.remember(n_state[0], n_action[0], n_reward[0], n_new_state[0], n_done[0])
+        # for i in range(1, NUM_AGENTS):
+        #     if n_done[i]:
+        #         continue
+        #     ddpg_agents[0].remember(n_state[i], n_action[i], n_reward[i], n_new_state[i], n_done[i])
 
         if total_steps > WARM_UP_STEPS and not EVALUATE:                       
-            actor_loss, critic_loss = ddpg_agents[0].learn()
+            actor_loss, critic_loss = ddpg.learn()
             tb_writer.add_scalar("Actor Loss/Steps", actor_loss, total_steps)
             tb_writer.add_scalar("Critic Loss/Steps", critic_loss, total_steps)
                                                 
@@ -109,10 +110,7 @@ for eps in range(TOTAL_EPISODES):
     # print(torch.cuda.memory_summary())
 
     if not EVALUATE:
-        ddpg_agents[0].save_weights(MODEL_PATH)
-        for i in range(1, NUM_AGENTS):
-            DDPG._hard_update(ddpg_agents[0].actor, ddpg_agents[i].actor)
-            DDPG._hard_update(ddpg_agents[0].critic, ddpg_agents[i].critic)
+        ddpg.save_weights(MODEL_PATH)
 
     tb_writer.flush()
 

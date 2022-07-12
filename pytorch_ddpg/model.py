@@ -8,11 +8,12 @@ class ActorNetwork(nn.Module):
     def __init__(self, n_states, n_actions, init_w=0.0005):
         super(ActorNetwork, self).__init__()
         
-        self.input = nn.Linear(n_states, 600)   # Input Layer                
-        self.fc1 = nn.Linear(600, 300)       # Hidden Layer1        
-        self.fc2 = nn.Linear(300, n_actions) # Hidden Layer2
+        self.input = nn.Linear(n_states, 1024)   # Input Layer                
+        self.fc1 = nn.Linear(1024, 512)       # Hidden Layer1        
+        self.fc2 = nn.Linear(512, n_actions) # Hidden Layer2
         self.relu = nn.LeakyReLU()
         self.tanh = nn.Tanh()
+        self.bn1 = nn.BatchNorm1d(num_features=1024, eps=0.001, momentum=0.01, affine=False)
         self.init_weights(init_w)
 
     def init_weights(self, init_w):
@@ -21,7 +22,8 @@ class ActorNetwork(nn.Module):
         self.fc2.weight.data.uniform_(-init_w, init_w) 
 
     def forward(self, state):        
-        out = self.input(state)        
+        out = self.input(state)       
+        out = self.bn1(out) 
         out = self.relu(out)
         out = self.fc1(out)
         out = self.relu(out)
@@ -35,14 +37,14 @@ class CriticNetwork(nn.Module):
     def __init__(self, n_states, n_actions, init_w=0.00005):
         super(CriticNetwork, self).__init__()
         
-        self.state_input = nn.Linear(n_states, 600)     # Input Layer of states
-        self.action_input = nn.Linear(n_actions, 300)   # Input Layer of actions
-        self.fc1 = nn.Linear(600, 300)            
-        self.fc2 = nn.Linear(300, 150)      
-        self.output = nn.Linear(150, 1)
-        self.bn1 = nn.BatchNorm1d(num_features=600, eps=0.001, momentum=0.01, affine=False)
-        self.bn2 = nn.BatchNorm1d(num_features=300, eps=0.001, momentum=0.01, affine=False)
-        self.bn3 = nn.BatchNorm1d(num_features=150, eps=0.001, momentum=0.01, affine=False)        
+        self.state_input = nn.Linear(n_states, 1024)     # Input Layer of states
+        self.action_input = nn.Linear(n_actions, 512)   # Input Layer of actions
+        self.fc1 = nn.Linear(1024, 512)            
+        self.fc2 = nn.Linear(512, 256)      
+        self.output = nn.Linear(256, 1)
+        self.bn1 = nn.BatchNorm1d(num_features=1024, eps=0.001, momentum=0.01, affine=False)
+        self.bn2 = nn.BatchNorm1d(num_features=512, eps=0.001, momentum=0.01, affine=False)
+        self.bn3 = nn.BatchNorm1d(num_features=256, eps=0.001, momentum=0.01, affine=False)        
         self.relu = nn.LeakyReLU()        
 
         # self.input = nn.Linear(n_states, 600)   # Input Layer                
