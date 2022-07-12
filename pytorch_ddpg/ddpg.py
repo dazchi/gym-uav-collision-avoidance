@@ -1,9 +1,11 @@
+import time
 import numpy as np
 import torch
 from torch import nn
 from torch.autograd import Variable
 from pytorch_ddpg.model import ActorNetwork, CriticNetwork
-from pytorch_ddpg.buffer import ReplayBuffer
+# from pytorch_ddpg.buffer import ReplayBuffer
+from pytorch_ddpg.buffer_tensor import ReplayBuffer
 from pytorch_ddpg.ou import OUActionNoise
 
 USE_CUDA = torch.cuda.is_available()
@@ -12,7 +14,7 @@ DEVICE = torch.device("cuda" if USE_CUDA else "cpu")
 UNBALANCE_P = 0.8
 
 class DDPG(object):
-    def __init__(self, n_states, n_actions, buffer_size=1e6, batch_size=256, noise_std_dev=0.2, actor_lr=1e-4, critic_lr=1e-3, tau=0.001, gamma=0.99):
+    def __init__(self, n_states, n_actions, buffer_size=1e6, batch_size=256, noise_std_dev=0.2, actor_lr=1e-4, critic_lr=1e-3, tau=0.001, gamma=0.99):        
         self.n_states = n_states
         self.n_actions = n_actions
 
@@ -43,14 +45,13 @@ class DDPG(object):
         if random_act:
             action = np.random.uniform(-1*np.ones(self.n_actions), np.ones(self.n_actions), self.n_actions)
         else:
-            state = self._to_tensor(state).unsqueeze(0)                
+            state = self._to_tensor(state).unsqueeze(0)                 
             action = self.actor(state)
-            action = self._to_numpy(action).squeeze(0)
+            action = self._to_numpy(action).squeeze(0)            
 
-        action = action + self.noise() if noise else 0
-        
+        action += self.noise() if noise else 0        
         action = np.clip(action, -1., 1.)
-    
+
         return action
 
 
@@ -59,19 +60,33 @@ class DDPG(object):
                 
         state_batch, action_batch, reward_batch, \
             next_state_batch, done_batch = zip(*batch)
-  
-        state_batch = self._to_tensor(np.asarray(state_batch))
-        action_batch = self._to_tensor(np.asarray(action_batch))        
-        reward_batch = self._to_tensor(np.asarray(reward_batch))
-        next_state_batch = self._to_tensor(np.asarray(next_state_batch), volatile=True)
-        done_batch = self._to_tensor(np.asarray(done_batch))
+          
+        # t1 = time.time()
+        # state_batch = self._to_tensor(np.asarray(state_batch))
+        # action_batch = self._to_tensor(np.asarray(action_batch))        
+        # reward_batch = self._to_tensor(np.asarray(reward_batch))
+        # next_state_batch = self._to_tensor(np.asarray(next_state_batch), volatile=True)
+        # done_batch = self._to_tensor(np.asarray(done_batch))
+        # torch.cuda.synchronize()        
+        # print("\t\t\t\t\t\t\t\tt = %.5f" % (time.time()-t1),end='\r')
+        
+        t1 = time.time()
+        state_batch = torch.stack(state_batch)
+        action_batch = torch.stack(action_batch)   
+        reward_batch = torch.stack(reward_batch)
+        next_state_batch = torch.stack(next_state_batch)
+        done_batch = torch.stack(done_batch)
+        torch.cuda.synchronize()        
+        print("\t\t\t\t\t\t\t\tt = %.5f" % (time.time()-t1),end='\r')
 
-        
+        t2 = time.time()
         # Update critic network
-        y = reward_batch + self.gamma * (1 - done_batch) * self.critic_target(next_state_batch, self.actor_target(next_state_batch))                       
-        q = self.critic(state_batch, action_batch)
+        y = reward_batch + self.gamma * (1 - done_batch) * self.critic_target(next_state_batch, self.actor_target(next_state_batch))                   
+        q = self.critic(state_batch, action_batch)        
         
-        self.critic.zero_grad()
+        scaler = torch.cuda.amp.grad_scaler.GradScaler()
+
+        self.critic.zero_grad(set_to_none=True)
         # loss_function = nn.MSELoss()
         loss_function = nn.L1Loss()     # Mean Absolute Loss                
         critic_loss = loss_function(y, q)
@@ -79,21 +94,43 @@ class DDPG(object):
         self.critic_optimizer.step()        
 
         # Update actor network
-        self.actor.zero_grad()
+        self.actor.zero_grad(set_to_none=True)
         actor_loss = -self.critic(state_batch, self.actor(state_batch))
         actor_loss = actor_loss.mean()
-        actor_loss.backward()
+        actor_loss.backward()        
         self.actor_optimizer.step()
-        
-                
+
+        # scaler.scale(critic_loss).backward()
+        # scaler.scale(actor_loss).backward()
+        # scaler.step(self.critic_optimizer)
+        # scaler.step(self.actor_optimizer)
+                        
         self._soft_update(self.actor, self.actor_target, self.tau)
-        self._soft_update(self.critic, self.critic_target, self.tau)        
+        self._soft_update(self.critic, self.critic_target, self.tau)   
+        
+        
+        torch.cuda.synchronize()       
+        t2 = time.time() - t2    
+        print("\t\t\t\t\t\t\t\t\t\tt = %.5f" % t2,end='\r')
+
+        # state_batch.detach()
+        # action_batch.detach()
+        # reward_batch.detach()
+        # next_state_batch.detach()
+        # done_batch.detach()
+        # del state_batch, action_batch, reward_batch, next_state_batch, done_batch        
 
     def eval(self):
         self.actor.eval()
         self.actor_target.eval()
         self.critic.eval()
         self.critic_target.eval()
+
+    def train(self):
+        self.actor.train()
+        self.actor_target.train()
+        self.critic.train()
+        self.critic_target.train()
 
     def load_weights(self, output):
         if output is None: return

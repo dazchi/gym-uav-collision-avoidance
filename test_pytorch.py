@@ -1,14 +1,19 @@
 import sys
+import os
 import random
+import time
 import torch
+import gc
 import numpy as np
 from pytorch_ddpg.ddpg import DDPG
 from gym_uav_collision_avoidance.envs import UAVWorld2D
 from torchviz import make_dot
 
+os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+
 MODEL_PATH = './weights/ddpg'
 WARM_UP_STEPS = 1000
-MAX_EPISOED_STEPS = 300000
+MAX_EPISOED_STEPS = 3000
 TOTAL_EPISODES = 1000
 EVALUATE = False
 LOAD_MODEL = False
@@ -16,6 +21,8 @@ LOAD_MODEL = False
 EPSILON_GREEDY = 0.95
 
 # If GPU is to be used
+torch.set_flush_denormal(True)
+torch.backends.cudnn.benchmark = True
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print('Using device = %s' % device)
 
@@ -26,11 +33,13 @@ n_actions = env.action_space.shape[0]
 ddpg = DDPG(n_observations, n_actions)
 
 
-if EVALUATE or EVALUATE:    
+if EVALUATE or LOAD_MODEL:    
     ddpg.load_weights(MODEL_PATH)
 
 if EVALUATE:
-    ddpg.eval()    
+    ddpg.eval()
+else:
+    ddpg.train()
 
 total_steps = 0
 state, info = env.reset(return_info=True)
@@ -44,19 +53,28 @@ state, info = env.reset(return_info=True)
 
 for eps in range(TOTAL_EPISODES): 
     score = 0
+    eps_t = time.time()
+    eps_steps = 0
+    tr_list = []
+    tca_list = []
+    tl_list = []
     for steps in range(MAX_EPISOED_STEPS):
-        random_action = (not LOAD_MODEL and (total_steps < WARM_UP_STEPS)) or (random.random() > EPSILON_GREEDY + (1-EPSILON_GREEDY)*eps/TOTAL_EPISODES)                
-        action = ddpg.choose_action(state, random_action, noise=not EVALUATE)        
-        new_state, reward, done, info = env.step(action * env.action_space.high)                        
-        
-        ddpg.remember(state, action, reward, new_state, done)        
+        random_action = (not LOAD_MODEL and (total_steps < WARM_UP_STEPS)) or (random.random() > EPSILON_GREEDY + (1-EPSILON_GREEDY)*eps/TOTAL_EPISODES) 
 
-        if total_steps > WARM_UP_STEPS and not EVALUATE:                    
-            ddpg.learn()
+
+        action = ddpg.choose_action(state, random_action and not EVALUATE, noise=not EVALUATE)        
+
+        new_state, reward, done, info = env.step(action * env.action_space.high)                        
+                
+        ddpg.remember(state, action, reward, new_state, done)                
+
+        if total_steps > WARM_UP_STEPS and not EVALUATE:                       
+            ddpg.learn()            
                                                 
         state = new_state
         score += reward
         total_steps += 1    
+        eps_steps += 1
         print("Steps = %d, Reward = %.3f, Score = %.3f" % (steps, reward, score), end='\r')
         env.render()        
 
@@ -64,11 +82,16 @@ for eps in range(TOTAL_EPISODES):
             state, info = env.reset(return_info=True)
             break
     
+    eps_t = time.time() - eps_t
+    steps_per_sec = eps_steps / eps_t
     sys.stdout.write("\033[K")
-    print("Total Steps = %d, Episode = %d, Score = %.3f" % (total_steps, eps, score))
+    print("Total Steps = %d, Episode = %d, Score = %.3f, Steps Per Sec = %.2f" % (total_steps, eps, score, steps_per_sec))    
 
     if not EVALUATE:
         ddpg.save_weights(MODEL_PATH)
+
+    torch.cuda.empty_cache()    
+    gc.collect()
 
 env.close()
 

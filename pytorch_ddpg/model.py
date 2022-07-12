@@ -40,16 +40,16 @@ class CriticNetwork(nn.Module):
         self.fc1 = nn.Linear(600, 300)            
         self.fc2 = nn.Linear(300, 150)      
         self.output = nn.Linear(150, 1)
-        self.bn1 = nn.BatchNorm1d(num_features=600)
-        self.bn2 = nn.BatchNorm1d(num_features=300)
-        self.bn3 = nn.BatchNorm1d(num_features=150)        
+        self.bn1 = nn.BatchNorm1d(num_features=600, eps=0.001, momentum=0.01, affine=False)
+        self.bn2 = nn.BatchNorm1d(num_features=300, eps=0.001, momentum=0.01, affine=False)
+        self.bn3 = nn.BatchNorm1d(num_features=150, eps=0.001, momentum=0.01, affine=False)        
         self.relu = nn.LeakyReLU()        
 
         # self.input = nn.Linear(n_states, 600)   # Input Layer                
         # self.fc1 = nn.Linear(600 + n_actions, 300)       # Hidden Layer1        
         # self.fc2 = nn.Linear(300, 1) # Hidden Layer2
         # self.relu = nn.LeakyReLU()        
-        # self.init_weights(init_w)
+        self.init_weights(init_w)
 
     def init_weights(self, init_w):
         self.state_input.weight.data = fanin_init(self.state_input.weight.data.size())
@@ -65,10 +65,10 @@ class CriticNetwork(nn.Module):
     def forward(self, state, action):
         state_out = self.relu(self.state_input(state))        
         action_out = self.relu(self.action_input(action))        
-        # state_out = self.bn1(state_out)
+        state_out = self.bn1(state_out)
         state_out = self.relu(self.fc1(state_out))    
-        add = torch.add(state_out, action_out)
-        # add = self.bn2(add)
+        add = torch.add(state_out, action_out)                
+        add = self.bn2(add)
         out = self.relu(self.fc2(add))        
         # out = self.bn3(out)
         out = self.output(out)        
