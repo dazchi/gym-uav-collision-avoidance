@@ -52,7 +52,7 @@ class ReplayBuffer:
         state = to_tensor(state)
         action = to_tensor(action)  
         r = to_tensor(np.expand_dims(r, -1))
-        sn = to_tensor(sn, True)
+        sn = to_tensor(sn, True, requires_grad=False)
         d = to_tensor(np.expand_dims(d, -1))
         lock.acquire()
         self.buffer.append([state, action, r, sn, d])

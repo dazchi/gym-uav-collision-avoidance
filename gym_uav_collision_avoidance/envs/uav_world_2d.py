@@ -51,7 +51,8 @@ class UAVWorld2D(gym.Env):
         #     }
         # )
 
-        self.observation_space = spaces.Box(-1, 1, shape=(4,), dtype=np.float32)
+        # self.observation_space = spaces.Box(-1, 1, shape=(4,), dtype=np.float32)
+        self.observation_space = spaces.Box(np.array([0.,-1.,0.,-1.]), np.array([1.,1.,1.,1.]), shape=(4,), dtype=np.float32)
 
         # We have 4 actions, corresponding to "right", "up", "left", "down", "right"
         # self.action_space = spaces.Dict(
@@ -74,33 +75,39 @@ class UAVWorld2D(gym.Env):
         self.clock = None
 
     def _get_obs(self):
-        normalized_agent_speed = self._agent_speed / self.max_speed
-        normalized_target_relative_position = (self._target_location - self._agent_location) / self.map_diagonal_size
-        target_theta = math.atan2((self._target_location - self._agent_location)[1],(self._target_location - self._agent_location)[0])
-        agent_theta = math.atan2(self._agent_speed[1],self._agent_speed[0])
-        normalized_relative_target_theta = target_theta / math.pi
+        # normalized_agent_speed = self._agent_speed / self.max_speed
+        # normalized_target_relative_position = (self._target_location - self._agent_location) / self.map_diagonal_size
+        # target_theta = math.atan2((self._target_location - self._agent_location)[1],(self._target_location - self._agent_location)[0])
+        # agent_theta = math.atan2(self._agent_speed[1],self._agent_speed[0])
+        # normalized_relative_target_theta = target_theta / math.pi
+        # normalized_agent_theta = agent_theta / math.pi
+        # delta_theta = target_theta - agent_theta
+        # delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta)) 
+        # normalized_delta_theta = delta_theta / math.pi
+
+        normalized_agent_speed = np.linalg.norm(self._agent_speed) / np.linalg.norm(self.max_speed)
+        agent_theta =  math.atan2(self._agent_speed[1],self._agent_speed[0])
         normalized_agent_theta = agent_theta / math.pi
-        delta_theta = target_theta - agent_theta
+        relative_target_theta = math.atan2((self._target_location - self._agent_location)[1],(self._target_location - self._agent_location)[0])
+        delta_theta = relative_target_theta - agent_theta
         delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta)) 
         normalized_delta_theta = delta_theta / math.pi
+        normalized_target_theta = relative_target_theta / math.pi
+        relative_target_distance = np.linalg.norm(self._target_location - self._agent_location)
+        normalized_target_distance = relative_target_distance / self.map_diagonal_size
 
-        # return {
-        #     # "agent_speed": np.concatenate((self._agent_location, self._agent_speed)),            
-        #     # "target": self._target_location,            
-        #     # "agent_speed": self.normalized_agent_speed,
-        #     # "agent_theta": math.atan2(self._agent_speed[1],self._agent_speed[0]),
-        #     # "target_distance": np.linalg.norm(self._target_location - self._agent_location),
-        #     # "target_theta": math.atan2((self._target_location - self._agent_location)[1],(self._target_location - self._agent_location)[0]),
-        #     "normalized_agent_speed": normalized_agent_speed,
-        #     "normalized_target_relative_position": normalized_target_relative_position,
-        #     "normalized_relative_target_theta": normalized_relative_target_theta,
-        #     "normalized_agent_theta": normalized_agent_theta,
-        #     "normalized_delta_theta": normalized_delta_theta,
-        # }
-        return np.array([normalized_agent_speed[0],
-                         normalized_agent_speed[1],
-                         normalized_target_relative_position[0],
-                         normalized_target_relative_position[1],
+
+        # return np.array([normalized_agent_speed[0],
+        #                  normalized_agent_speed[1],
+        #                  normalized_target_relative_position[0],
+        #                  normalized_target_relative_position[1],
+        #                 #  normalized_delta_theta
+        #                 ])
+        
+        return np.array([normalized_agent_speed,
+                         normalized_agent_theta,
+                         normalized_target_distance,
+                         normalized_delta_theta,
                         #  normalized_delta_theta
                         ])
 

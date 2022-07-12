@@ -3,22 +3,28 @@ import os
 import random
 import time
 import torch
+import math
 import gc
 import numpy as np
 from pytorch_ddpg.ddpg import DDPG
+from torch.utils.tensorboard import SummaryWriter
 from gym_uav_collision_avoidance.envs import UAVWorld2D
 from torchviz import make_dot
 
-os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+
+torch.autograd.set_detect_anomaly(False)
+torch.autograd.profiler.profile(False)
+torch.autograd.profiler.emit_nvtx(False)
 
 MODEL_PATH = './weights/ddpg'
 WARM_UP_STEPS = 1000
 MAX_EPISOED_STEPS = 3000
 TOTAL_EPISODES = 1000
 EVALUATE = False
-LOAD_MODEL = False
+LOAD_MODEL = True
 
 EPSILON_GREEDY = 0.95
+
 
 # If GPU is to be used
 torch.set_flush_denormal(True)
@@ -26,7 +32,9 @@ torch.backends.cudnn.benchmark = True
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print('Using device = %s' % device)
 
+
 env = UAVWorld2D()
+tb_writer = SummaryWriter()
 
 n_observations = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
@@ -63,21 +71,25 @@ for eps in range(TOTAL_EPISODES):
 
 
         action = ddpg.choose_action(state, random_action and not EVALUATE, noise=not EVALUATE)        
-
+        v = action[0] * np.linalg.norm(env.action_space.high)
+        theta = action[1] * math.pi
+        scaled_action = np.array([v*math.cos(theta), v*math.sin(theta)])
+        
         new_state, reward, done, info = env.step(action * env.action_space.high)                        
                 
         ddpg.remember(state, action, reward, new_state, done)                
 
         if total_steps > WARM_UP_STEPS and not EVALUATE:                       
-            ddpg.learn()            
+            actor_loss, critic_loss = ddpg.learn()
+            tb_writer.add_scalar("Actor Loss/Steps", actor_loss, total_steps)
+            tb_writer.add_scalar("Critic Loss/Steps", critic_loss, total_steps)
                                                 
         state = new_state
         score += reward
-        total_steps += 1    
+        total_steps += 1   
         eps_steps += 1
-        print("Steps = %d, Reward = %.3f, Score = %.3f" % (steps, reward, score), end='\r')
-        env.render()        
-
+        print("Steps = %d, Reward = %.3f, Score = %.3f" % (steps, reward, score), end='\r')        
+        env.render()                
         if done:
             state, info = env.reset(return_info=True)
             break
@@ -86,15 +98,25 @@ for eps in range(TOTAL_EPISODES):
     steps_per_sec = eps_steps / eps_t
     sys.stdout.write("\033[K")
     print("Total Steps = %d, Episode = %d, Score = %.3f, Steps Per Sec = %.2f" % (total_steps, eps, score, steps_per_sec))    
+    tb_writer.add_scalar("Score/Episodes", score, eps)
+
+    # print(torch.cuda.memory_summary())
 
     if not EVALUATE:
         ddpg.save_weights(MODEL_PATH)
 
-    torch.cuda.empty_cache()    
-    gc.collect()
+    tb_writer.flush()
+
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
+    gc.collect()    
+
 
 env.close()
+tb_writer.close()
 
 
 
 
+
+    

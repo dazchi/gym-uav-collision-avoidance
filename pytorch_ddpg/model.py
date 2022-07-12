@@ -68,7 +68,7 @@ class CriticNetwork(nn.Module):
         state_out = self.bn1(state_out)
         state_out = self.relu(self.fc1(state_out))    
         add = torch.add(state_out, action_out)                
-        add = self.bn2(add)
+        # add = self.bn2(add)
         out = self.relu(self.fc2(add))        
         # out = self.bn3(out)
         out = self.output(out)        

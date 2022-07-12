@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.autograd import Variable
+from torch.cuda import amp
 from pytorch_ddpg.model import ActorNetwork, CriticNetwork
 # from pytorch_ddpg.buffer import ReplayBuffer
 from pytorch_ddpg.buffer_tensor import ReplayBuffer
@@ -45,7 +46,7 @@ class DDPG(object):
         if random_act:
             action = np.random.uniform(-1*np.ones(self.n_actions), np.ones(self.n_actions), self.n_actions)
         else:
-            state = self._to_tensor(state).unsqueeze(0)                 
+            state = self._to_tensor(state, volatile=True, requires_grad=False).unsqueeze(0)                 
             action = self.actor(state)
             action = self._to_numpy(action).squeeze(0)            
 
@@ -61,64 +62,76 @@ class DDPG(object):
         state_batch, action_batch, reward_batch, \
             next_state_batch, done_batch = zip(*batch)
           
-        # t1 = time.time()
         # state_batch = self._to_tensor(np.asarray(state_batch))
         # action_batch = self._to_tensor(np.asarray(action_batch))        
         # reward_batch = self._to_tensor(np.asarray(reward_batch))
         # next_state_batch = self._to_tensor(np.asarray(next_state_batch), volatile=True)
         # done_batch = self._to_tensor(np.asarray(done_batch))
-        # torch.cuda.synchronize()        
-        # print("\t\t\t\t\t\t\t\tt = %.5f" % (time.time()-t1),end='\r')
-        
-        t1 = time.time()
+
         state_batch = torch.stack(state_batch)
         action_batch = torch.stack(action_batch)   
         reward_batch = torch.stack(reward_batch)
         next_state_batch = torch.stack(next_state_batch)
-        done_batch = torch.stack(done_batch)
-        torch.cuda.synchronize()        
-        print("\t\t\t\t\t\t\t\tt = %.5f" % (time.time()-t1),end='\r')
+        done_batch = torch.stack(done_batch)                
+                
+        scaler = torch.cuda.amp.grad_scaler.GradScaler()         
 
-        t2 = time.time()
+        for param in self.critic.parameters():
+            param.grad = None
+
+        for param in self.actor.parameters():
+            param.grad = None      
+
+        with amp.autocast(enabled=USE_CUDA):
+            y = reward_batch + self.gamma * (1 - done_batch) * self.critic_target(next_state_batch, self.actor_target(next_state_batch))                   
+            q = self.critic(state_batch, action_batch)        
+            loss_function = nn.L1Loss()
+            critic_loss = loss_function(y, q)
+
+        with amp.autocast(enabled=USE_CUDA):
+            actor_loss = -self.critic(state_batch, self.actor(state_batch))          
+            actor_loss = actor_loss.mean()     
+
+                      
+        scaler.scale(critic_loss).backward()
+        scaler.scale(actor_loss).backward()
+        scaler.step(self.critic_optimizer)
+        scaler.step(self.actor_optimizer)
+                 
         # Update critic network
-        y = reward_batch + self.gamma * (1 - done_batch) * self.critic_target(next_state_batch, self.actor_target(next_state_batch))                   
-        q = self.critic(state_batch, action_batch)        
-        
-        scaler = torch.cuda.amp.grad_scaler.GradScaler()
-
-        self.critic.zero_grad(set_to_none=True)
+        # y = reward_batch + self.gamma * (1 - done_batch) * self.critic_target(next_state_batch, self.actor_target(next_state_batch))                   
+        # q = self.critic(state_batch, action_batch)        
+        # self.critic.zero_grad(set_to_none=True)
+        # for param in self.critic.parameters():
+        #     param.grad = None
         # loss_function = nn.MSELoss()
-        loss_function = nn.L1Loss()     # Mean Absolute Loss                
-        critic_loss = loss_function(y, q)
-        critic_loss.backward()
-        self.critic_optimizer.step()        
+        # loss_function = nn.L1Loss()     # Mean Absolute Loss                
+        # critic_loss = loss_function(y, q)
+        # critic_loss.backward()
+        # self.critic_optimizer.step()        
 
         # Update actor network
-        self.actor.zero_grad(set_to_none=True)
-        actor_loss = -self.critic(state_batch, self.actor(state_batch))
-        actor_loss = actor_loss.mean()
-        actor_loss.backward()        
-        self.actor_optimizer.step()
+        # self.actor.zero_grad(set_to_none=True)
+        # for param in self.actor.parameters():
+        #     param.grad = None
 
-        # scaler.scale(critic_loss).backward()
-        # scaler.scale(actor_loss).backward()
-        # scaler.step(self.critic_optimizer)
-        # scaler.step(self.actor_optimizer)
+        # actor_loss = -self.critic(state_batch, self.actor(state_batch))
+        # actor_loss = actor_loss.mean()
+        # actor_loss.backward()        
+        # self.actor_optimizer.step()
                         
         self._soft_update(self.actor, self.actor_target, self.tau)
-        self._soft_update(self.critic, self.critic_target, self.tau)   
-        
-        
-        torch.cuda.synchronize()       
-        t2 = time.time() - t2    
-        print("\t\t\t\t\t\t\t\t\t\tt = %.5f" % t2,end='\r')
+        self._soft_update(self.critic, self.critic_target, self.tau)                 
 
-        # state_batch.detach()
-        # action_batch.detach()
-        # reward_batch.detach()
-        # next_state_batch.detach()
-        # done_batch.detach()
-        # del state_batch, action_batch, reward_batch, next_state_batch, done_batch        
+        state_batch = state_batch.detach().cpu()
+        action_batch = action_batch.detach().cpu()
+        reward_batch = reward_batch.detach().cpu()
+        next_state_batch = next_state_batch.detach().cpu()
+        done_batch = done_batch.detach().cpu()
+        del state_batch, action_batch, reward_batch, next_state_batch, done_batch
+        
+        return actor_loss.item(), critic_loss.item()
+        
 
     def eval(self):
         self.actor.eval()
@@ -196,6 +209,6 @@ class DDPG(object):
         
 
     def _to_numpy(self, var):
-        return var.cpu().data.numpy() if USE_CUDA else var.data.numpy()
+        return var.detach().cpu().data.numpy() if USE_CUDA else var.data.numpy()
     
    
