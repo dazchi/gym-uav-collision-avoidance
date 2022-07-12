@@ -185,18 +185,21 @@ class DDPG(object):
         self.critic.cuda()
         self.critic_target.cuda()
 
-    def _hard_update(self, source, target):
+    @staticmethod
+    def _hard_update(source, target):
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(param.data)
 
-    def _soft_update(self, source, target, tau):
+    @staticmethod
+    def _soft_update(source, target, tau):
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(
                 target_param.data * (1.0 - tau) + param.data * tau
             )
         pass
 
-    def _to_tensor(self, ndarray, volatile=False, requires_grad=False, dtype=FLOAT):
+    @staticmethod
+    def _to_tensor(ndarray, volatile=False, requires_grad=False, dtype=FLOAT):
         if volatile:
             with torch.no_grad():
                 return Variable(
@@ -207,8 +210,8 @@ class DDPG(object):
                     torch.from_numpy(ndarray), requires_grad=requires_grad
                 ).type(dtype)        
         
-
-    def _to_numpy(self, var):
+    @staticmethod
+    def _to_numpy(var):
         return var.detach().cpu().data.numpy() if USE_CUDA else var.data.numpy()
     
    
