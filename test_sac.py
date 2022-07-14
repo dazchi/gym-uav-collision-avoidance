@@ -13,7 +13,7 @@ from pytorch_sac_temp.replay_memory import ReplayMemory
 from torchviz import make_dot
 
 
-MODEL_PATH = './weights/ddpg'
+MODEL_PATH = './weights/sac'
 WARM_UP_STEPS = 3000
 MAX_EPISOED_STEPS = 3000
 TOTAL_EPISODES = 1000
@@ -41,8 +41,8 @@ agent = SAC(n_observations, n_actions)
 
 
 if EVALUATE or LOAD_MODEL:    
-    # agent.load_weights(MODEL_PATH)
-    pass
+    agent.load_checkpoint(MODEL_PATH, EVALUATE)
+    
 
 
 total_steps = 0
@@ -116,8 +116,7 @@ for eps in range(TOTAL_EPISODES):
     # print(torch.cuda.memory_summary())
 
     if not EVALUATE:
-        # agent.save_weights(total_steps, eps, MODEL_PATH)
-        pass
+        agent.save_checkpoint(MODEL_PATH)        
 
     tb_writer.flush()
 
