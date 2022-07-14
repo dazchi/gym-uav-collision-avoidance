@@ -6,18 +6,14 @@ import torch
 import math
 import gc
 import numpy as np
-from pytorch_ddpg.ddpg import DDPG
+from pytorch_ddpg.td3 import TD3
 from torch.utils.tensorboard import SummaryWriter
 from gym_uav_collision_avoidance.envs import UAVWorld2D
 from torchviz import make_dot
 
 
-torch.autograd.set_detect_anomaly(False)
-torch.autograd.profiler.profile(False)
-torch.autograd.profiler.emit_nvtx(False)
-
 MODEL_PATH = './weights/ddpg'
-WARM_UP_STEPS = 5000
+WARM_UP_STEPS = 3000
 MAX_EPISOED_STEPS = 3000
 TOTAL_EPISODES = 1000
 EVALUATE = False
@@ -38,16 +34,16 @@ tb_writer = SummaryWriter()
 
 n_observations = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
-ddpg = DDPG(n_observations, n_actions)
+agent = TD3(n_observations, n_actions)
 
 
 if EVALUATE or LOAD_MODEL:    
-    ddpg.load_weights(MODEL_PATH)
+    agent.load_weights(MODEL_PATH)
 
 if EVALUATE:
-    ddpg.eval()
+    agent.eval()
 else:
-    ddpg.train()
+    agent.train()
 
 total_steps = 0
 state, info = env.reset(return_info=True)
@@ -70,19 +66,20 @@ for eps in range(TOTAL_EPISODES):
         random_action = (not LOAD_MODEL and (total_steps < WARM_UP_STEPS)) or (random.random() > EPSILON_GREEDY + (1-EPSILON_GREEDY)*eps/TOTAL_EPISODES) 
 
 
-        action = ddpg.choose_action(state, random_action and not EVALUATE, noise=not EVALUATE)        
+        action = agent.choose_action(state, random_action and not EVALUATE, noise=not EVALUATE)        
         v = (action[0]+1)/2 * np.linalg.norm(env.action_space.high)        
         theta = action[1] * math.pi
         converted_action = np.array([v*math.cos(theta), v*math.sin(theta)])
         
         new_state, reward, done, info = env.step(action * env.action_space.high)                        
                 
-        ddpg.remember(state, action, reward, new_state, done)                
+        agent.remember(state, action, reward, new_state, done)                
 
         if total_steps > WARM_UP_STEPS and not EVALUATE:                       
-            actor_loss, critic_loss = ddpg.learn()
+            actor_loss, critic_1_loss, critic_2_loss = agent.learn()
             tb_writer.add_scalar("Actor Loss/Steps", actor_loss, total_steps)
-            tb_writer.add_scalar("Critic Loss/Steps", critic_loss, total_steps)
+            tb_writer.add_scalar("Critic1 Loss/Steps", critic_1_loss, total_steps)
+            tb_writer.add_scalar("Critic2 Loss/Steps", critic_2_loss, total_steps)
                                                 
         state = new_state
         score += reward
@@ -103,7 +100,7 @@ for eps in range(TOTAL_EPISODES):
     # print(torch.cuda.memory_summary())
 
     if not EVALUATE:
-        ddpg.save_weights(total_steps, eps,MODEL_PATH)
+        agent.save_weights(total_steps, eps, MODEL_PATH)
 
     tb_writer.flush()
 

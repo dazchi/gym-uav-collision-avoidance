@@ -15,7 +15,7 @@ DEVICE = torch.device("cuda" if USE_CUDA else "cpu")
 UNBALANCE_P = 0.8
 
 class DDPG(object):
-    def __init__(self, n_states, n_actions, buffer_size=1e6, batch_size=256, noise_std_dev=0.2, actor_lr=1e-4, critic_lr=1e-3, tau=0.001, gamma=0.99):        
+    def __init__(self, n_states, n_actions, buffer_size=1e6, batch_size=512, noise_std_dev=0.2, actor_lr=1e-4, critic_lr=1e-3, tau=0.001, gamma=0.99):        
         self.n_states = n_states
         self.n_actions = n_actions
 
@@ -140,23 +140,55 @@ class DDPG(object):
             torch.load('{}/critic_target.pkl'.format(output))
         )
 
-    def save_weights(self,output):
-        torch.save(
-            self.actor.state_dict(),
-            '{}/actor.pkl'.format(output)
-        )
-        torch.save(
-            self.actor_target.state_dict(),
-            '{}/actor_target.pkl'.format(output)
-        )
-        torch.save(
-            self.critic.state_dict(),
-            '{}/critic.pkl'.format(output)
-        )
-        torch.save(
-            self.critic_target.state_dict(),
-            '{}/critic_target.pkl'.format(output)
-        )
+    def load_weights(self, output):
+        if output is None: return
+
+        actor_checkpoint = torch.load('{}/actor.chpt'.format(output))
+        critic_checkpoint = torch.load('{}/critic.chpt'.format(output))
+
+        self.actor.load_state_dict(actor_checkpoint['model_state_dict'])        
+        self.actor_target.load_state_dict(actor_checkpoint['target_model_state_dict'])
+        self.actor_optimizer.load_state_dict(actor_checkpoint['optimizer_state_dict'])
+        self.critic.load_state_dict(critic_checkpoint['model_state_dict'])        
+        self.critic_target.load_state_dict(critic_checkpoint['target_model_state_dict'])
+        self.critic_optimizer.load_state_dict(critic_checkpoint['optimizer_state_dict'])
+        
+        return actor_checkpoint['steps'], actor_checkpoint['episodes']
+
+    # def save_weights(self,output):
+    #     torch.save(
+    #         self.actor.state_dict(),
+    #         '{}/actor.pkl'.format(output)
+    #     )
+    #     torch.save(
+    #         self.actor_target.state_dict(),
+    #         '{}/actor_target.pkl'.format(output)
+    #     )
+    #     torch.save(
+    #         self.critic.state_dict(),
+    #         '{}/critic.pkl'.format(output)
+    #     )
+    #     torch.save(
+    #         self.critic_target.state_dict(),
+    #         '{}/critic_target.pkl'.format(output)
+    #     )
+    
+    def save_weights(self, steps, episodes, output):
+        torch.save({
+                'steps': steps,
+                'episodes': episodes,
+                'model_state_dict': self.actor.state_dict(),
+                'target_model_state_dict': self.actor_target.state_dict(),
+                'optimizer_state_dict': self.actor_optimizer.state_dict(),
+            },'{}/actor.chpt'.format(output))
+
+        torch.save({
+                'steps': steps,
+                'episodes': episodes,
+                'model_state_dict': self.critic.state_dict(),
+                'target_model_state_dict': self.critic_target.state_dict(),
+                'optimizer_state_dict': self.critic_optimizer.state_dict(),
+            },'{}/critic.chpt'.format(output))
 
     def _cuda(self):
         self.actor.cuda()

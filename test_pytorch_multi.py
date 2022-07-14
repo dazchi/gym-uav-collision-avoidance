@@ -21,10 +21,10 @@ WARM_UP_STEPS = 3000
 MAX_EPISOED_STEPS = 3000
 TOTAL_EPISODES = 1000
 EVALUATE = False
-LOAD_MODEL = False
+LOAD_MODEL = True
 
 EPSILON_GREEDY = 0.95
-NUM_AGENTS = 10
+NUM_AGENTS = 5
 
 # If GPU is to be used
 torch.set_flush_denormal(True)
@@ -50,9 +50,10 @@ ddpg = DDPG(n_observations, n_actions)
 # make_dot(x, params=dict(list(ddpg.actor.named_parameters()))).render("actor_network", format="png")
 # x = ddpg.critic(o, a)
 # make_dot(x, params=dict(list(ddpg.critic.named_parameters()))).render("critic_network", format="png")
-
+start_eps = 0
+total_steps = 0
 if EVALUATE or LOAD_MODEL:    
-    ddpg.load_weights(MODEL_PATH)
+    total_steps, start_eps = ddpg.load_weights(MODEL_PATH)
 
 if EVALUATE:
     ddpg.eval()
@@ -60,8 +61,8 @@ else:
     ddpg.train()
 
 n_state, _ = env.reset(return_info=True)
-total_steps = 0
-for eps in range(TOTAL_EPISODES): 
+
+for eps in range(start_eps, TOTAL_EPISODES): 
     score = 0
     eps_t = time.time()
     eps_steps = 0
@@ -81,10 +82,10 @@ for eps in range(TOTAL_EPISODES):
         n_new_state, n_reward, n_done, _ = env.step(n_action_scaled)              
 
         ddpg.remember(n_state[0], n_action[0], n_reward[0], n_new_state[0], n_done[0])
-        # for i in range(1, NUM_AGENTS):
-        #     if n_done[i]:
-        #         continue
-        #     ddpg_agents[0].remember(n_state[i], n_action[i], n_reward[i], n_new_state[i], n_done[i])
+        for i in range(1, NUM_AGENTS):
+            if n_done[i]:
+                continue
+            ddpg.remember(n_state[i], n_action[i], n_reward[i], n_new_state[i], n_done[i])
 
         if total_steps > WARM_UP_STEPS and not EVALUATE:                       
             actor_loss, critic_loss = ddpg.learn()
@@ -110,7 +111,7 @@ for eps in range(TOTAL_EPISODES):
     # print(torch.cuda.memory_summary())
 
     if not EVALUATE:
-        ddpg.save_weights(MODEL_PATH)
+        ddpg.save_weights(total_steps, eps, MODEL_PATH)
 
     tb_writer.flush()
 

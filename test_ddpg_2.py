@@ -6,7 +6,7 @@ import torch
 import math
 import gc
 import numpy as np
-from pytorch_ddpg.ddpg import DDPG
+from pytorch_ddpg.ddpg_2 import DDPG
 from torch.utils.tensorboard import SummaryWriter
 from gym_uav_collision_avoidance.envs import UAVWorld2D
 from torchviz import make_dot
@@ -44,10 +44,10 @@ ddpg = DDPG(n_observations, n_actions)
 if EVALUATE or LOAD_MODEL:    
     ddpg.load_weights(MODEL_PATH)
 
-if EVALUATE:
-    ddpg.eval()
-else:
-    ddpg.train()
+# if EVALUATE:
+#     ddpg.eval()
+# else:
+#     ddpg.train()
 
 total_steps = 0
 state, info = env.reset(return_info=True)
@@ -77,12 +77,13 @@ for eps in range(TOTAL_EPISODES):
         
         new_state, reward, done, info = env.step(action * env.action_space.high)                        
                 
-        ddpg.remember(state, action, reward, new_state, done)                
+        ddpg.remember(state, action, new_state, reward, done)                
 
         if total_steps > WARM_UP_STEPS and not EVALUATE:                       
-            actor_loss, critic_loss = ddpg.learn()
-            tb_writer.add_scalar("Actor Loss/Steps", actor_loss, total_steps)
-            tb_writer.add_scalar("Critic Loss/Steps", critic_loss, total_steps)
+            # actor_loss, critic_loss = ddpg.learn()
+            ddpg.learn()
+            # tb_writer.add_scalar("Actor Loss/Steps", actor_loss, total_steps)
+            # tb_writer.add_scalar("Critic Loss/Steps", critic_loss, total_steps)
                                                 
         state = new_state
         score += reward
@@ -102,8 +103,8 @@ for eps in range(TOTAL_EPISODES):
 
     # print(torch.cuda.memory_summary())
 
-    if not EVALUATE:
-        ddpg.save_weights(total_steps, eps,MODEL_PATH)
+    # if not EVALUATE:
+    #     # ddpg.save_weights(total_steps, eps,MODEL_PATH)
 
     tb_writer.flush()
 
