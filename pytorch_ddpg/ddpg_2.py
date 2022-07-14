@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pytorch_ddpg.model_2 import ActorNetwork, CriticNetwork
+from pytorch_ddpg.model import ActorNetwork, CriticNetwork
 from pytorch_ddpg.ou import OUActionNoise
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -45,6 +45,7 @@ class DDPG(object):
         self.batch_size = batch_size
 
     def choose_action(self, state, random_act=False, noise=True):        
+        self.actor.eval()
         if random_act:
             action = np.random.uniform(-1*np.ones(self.n_actions), np.ones(self.n_actions), self.n_actions)
         else:
@@ -60,7 +61,7 @@ class DDPG(object):
         self.buffer.add(prev_state, action, reward, state, done)
 
     def learn(self):
-
+        self.actor.train()
         # Sample replay buffer 
         state, action, next_state, reward, not_done = self.buffer.sample(self.batch_size, 0.8)
 		
@@ -98,24 +99,41 @@ class DDPG(object):
 
         for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
-            
 
-    def save(self, filename):
-        torch.save(self.critic.state_dict(), filename + "_critic")
-        torch.save(self.critic_optimizer.state_dict(), filename + "_critic_optimizer")
+        return actor_loss.item(), critic_loss.item()
 
-        torch.save(self.actor.state_dict(), filename + "_actor")
-        torch.save(self.actor_optimizer.state_dict(), filename + "_actor_optimizer")
+    def load_weights(self, output):
+        if output is None: return
 
+        actor_checkpoint = torch.load('{}/actor.chpt'.format(output))
+        critic_checkpoint = torch.load('{}/critic.chpt'.format(output))
 
-    def load(self, filename):
-        self.critic.load_state_dict(torch.load(filename + "_critic"))
-        self.critic_optimizer.load_state_dict(torch.load(filename + "_critic_optimizer"))
-        self.critic_target = copy.deepcopy(self.critic)
+        self.actor.load_state_dict(actor_checkpoint['model_state_dict'])        
+        self.actor_target.load_state_dict(actor_checkpoint['target_model_state_dict'])
+        self.actor_optimizer.load_state_dict(actor_checkpoint['optimizer_state_dict'])
+        self.critic.load_state_dict(critic_checkpoint['model_state_dict'])        
+        self.critic_target.load_state_dict(critic_checkpoint['target_model_state_dict'])
+        self.critic_optimizer.load_state_dict(critic_checkpoint['optimizer_state_dict'])
+        
+        return actor_checkpoint['steps'], actor_checkpoint['episodes']
 
-        self.actor.load_state_dict(torch.load(filename + "_actor"))
-        self.actor_optimizer.load_state_dict(torch.load(filename + "_actor_optimizer"))
-        self.actor_target = copy.deepcopy(self.actor)
+    
+    def save_weights(self, steps, episodes, output):
+        torch.save({
+                'steps': steps,
+                'episodes': episodes,
+                'model_state_dict': self.actor.state_dict(),
+                'target_model_state_dict': self.actor_target.state_dict(),
+                'optimizer_state_dict': self.actor_optimizer.state_dict(),
+            },'{}/actor.chpt'.format(output))
+
+        torch.save({
+                'steps': steps,
+                'episodes': episodes,
+                'model_state_dict': self.critic.state_dict(),
+                'target_model_state_dict': self.critic_target.state_dict(),
+                'optimizer_state_dict': self.critic_optimizer.state_dict(),
+            },'{}/critic.chpt'.format(output))
 
 class ReplayBuffer(object):
     def __init__(self, state_dim, action_dim, max_size=int(1e6), unbalance_gap=0.5):

@@ -3,15 +3,12 @@ import numpy as np
 import torch
 from torch import nn
 from torch.autograd import Variable
-# from pytorch_ddpg.buffer import ReplayBuffer
-from pytorch_ddpg.buffer_tensor import ReplayBuffer
 from pytorch_ddpg.ou import OUActionNoise
 # from pytorch_ddpg.model import ActorNetwork, CriticNetwork
 
 USE_CUDA = torch.cuda.is_available()
 FLOAT = torch.cuda.FloatTensor if USE_CUDA else torch.FloatTensor
 DEVICE = torch.device("cuda" if USE_CUDA else "cpu")
-UNBALANCE_P = 0
 
 from cmath import pi
 import numpy as np
@@ -20,11 +17,11 @@ from torch import nn
 
 class ActorNetwork(nn.Module):
     
-    def __init__(self, n_states, n_actions, init_w=0.0005):
+    def __init__(self, n_states, n_actions, init_w=1e-4):
         super(ActorNetwork, self).__init__()
         
-        self.input = nn.Linear(n_states, 400)   # Input Layer                
-        self.fc1 = nn.Linear(400, 300)       # Hidden Layer1        
+        self.input = nn.Linear(n_states, 600)   # Input Layer                
+        self.fc1 = nn.Linear(600, 300)       # Hidden Layer1        
         self.fc2 = nn.Linear(300, n_actions) # Hidden Layer2
         self.relu = nn.LeakyReLU()
         self.tanh = nn.Tanh()        
@@ -44,11 +41,11 @@ class ActorNetwork(nn.Module):
 
 class CriticNetwork(nn.Module):
     
-    def __init__(self, n_states, n_actions, init_w=0.00005):
+    def __init__(self, n_states, n_actions, init_w=1e-3):
         super(CriticNetwork, self).__init__()
         
-        self.state_input = nn.Linear(n_states + n_actions, 400)     # Input Layer of states        
-        self.fc1 = nn.Linear(400, 300)            
+        self.state_input = nn.Linear(n_states + n_actions, 600)     # Input Layer of states        
+        self.fc1 = nn.Linear(600, 300)            
         self.fc2 = nn.Linear(300, 1)              
         self.relu = nn.LeakyReLU()        
         self.init_weights(init_w)
@@ -67,7 +64,7 @@ class CriticNetwork(nn.Module):
 
 
 class TD3(object):
-    def __init__(self, n_states, n_actions, buffer_size=1e6, batch_size=256, noise_std_dev=0.1, actor_lr=3e-4, critic_lr=3e-4, tau=0.005, gamma=0.99):        
+    def __init__(self, n_states, n_actions, buffer_size=1e5, batch_size=64, noise_std_dev=0.1, actor_lr=1e-4, critic_lr=1e-3, tau=0.001, gamma=0.99):        
         self.n_states = n_states
         self.n_actions = n_actions
 
@@ -87,7 +84,8 @@ class TD3(object):
         self._hard_update(self.critic_1, self.critic_1_target)
         self._hard_update(self.critic_2, self.critic_2_target)
 
-        self.buffer = ReplayBuffer(buffer_size, batch_size)
+        self.buffer = ReplayBuffer(n_states, n_actions, int(buffer_size))
+        self.batch_size = batch_size
         self.noise =  OUActionNoise(mean=np.zeros(1), std_deviation=float(noise_std_dev) * np.ones(1))
         self.tau = tau  # Target network update rate
         self.gamma = gamma  # Reward discount
@@ -100,8 +98,8 @@ class TD3(object):
         if USE_CUDA: self._cuda()
     
 
-    def remember(self, prev_state, action, reward, state, done):
-        self.buffer.append(prev_state, action, reward, state, done)        
+    def remember(self, prev_state, action, state, reward, done):
+        self.buffer.add(prev_state, action, state, reward, done)        
     
     def choose_action(self, state, random_act=False, noise=True):        
         if random_act:
@@ -119,37 +117,29 @@ class TD3(object):
 
     def learn(self):        
         self.iter += 1
-        batch = self.buffer.get_batch(unbalance_p=UNBALANCE_P)
-                
-        state_batch, action_batch, reward_batch, \
-            next_state_batch, done_batch = zip(*batch)
-                  
+       # Sample replay buffer 
+        state, action, next_state, reward, not_done = self.buffer.sample(self.batch_size)
 
-        state_batch = torch.stack(state_batch)
-        action_batch = torch.stack(action_batch)   
-        reward_batch = torch.stack(reward_batch)
-        next_state_batch = torch.stack(next_state_batch)
-        done_batch = torch.stack(done_batch)                   
 
         with torch.no_grad():
             # Select action according to policy and clipped noise
             noise = (
-                torch.rand_like(action_batch) * self.policy_noise
+                torch.rand_like(action) * self.policy_noise
             ).clamp(-self.policy_noise_clip, self.policy_noise_clip)
 
             next_action = (
-                self.actor_target(next_state_batch) + noise
+                self.actor_target(next_state) + noise
             ).clamp(-1, 1)
         
             # Compute target Q Value
-            target_Q1 = self.critic_1_target(next_state_batch, next_action)
-            target_Q2 = self.critic_2_target(next_state_batch, next_action)
+            target_Q1 = self.critic_1_target(next_state, next_action)
+            target_Q2 = self.critic_2_target(next_state, next_action)
             target_Q = torch.min(target_Q1, target_Q2)
-            target_Q = reward_batch + (1 - done_batch) * self.gamma * target_Q
+            target_Q = reward + not_done * self.gamma * target_Q
         
         # Get current Q estimates
-        current_Q1 = self.critic_1(state_batch, action_batch)
-        current_Q2 = self.critic_2(state_batch, action_batch)
+        current_Q1 = self.critic_1(state, action)
+        current_Q2 = self.critic_2(state, action)
 
         # Compute critic loss
         critic_loss_function = nn.MSELoss()
@@ -168,7 +158,7 @@ class TD3(object):
         # Delayed policy updates
         if self.iter % self.policy_freq == 0:
             # Compute actor losse
-            actor_loss = -self.critic_1(state_batch, self.actor(state_batch))            
+            actor_loss = -self.critic_1(state, self.actor(state))            
             actor_loss = actor_loss.mean()
             
 
@@ -289,3 +279,41 @@ def fanin_init(size, fanin=None):
     fanin = fanin or size[0]
     v = 1. / np.sqrt(fanin)
     return torch.Tensor(size).uniform_(-v, v)
+
+
+class ReplayBuffer(object):
+    def __init__(self, state_dim, action_dim, max_size=int(1e6)):
+        self.max_size = max_size
+        self.ptr = 0
+        self.size = 0
+
+        self.state = np.zeros((max_size, state_dim))
+        self.action = np.zeros((max_size, action_dim))
+        self.next_state = np.zeros((max_size, state_dim))
+        self.reward = np.zeros((max_size, 1))
+        self.not_done = np.zeros((max_size, 1))
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+    def add(self, state, action, next_state, reward, done):
+        self.state[self.ptr] = state
+        self.action[self.ptr] = action
+        self.next_state[self.ptr] = next_state
+        self.reward[self.ptr] = reward
+        self.not_done[self.ptr] = 1. - done
+
+        self.ptr = (self.ptr + 1) % self.max_size
+        self.size = min(self.size + 1, self.max_size)
+
+
+    def sample(self, batch_size):
+        ind = np.random.randint(0, self.size, size=batch_size)
+
+        return (
+            torch.FloatTensor(self.state[ind]).to(self.device),
+            torch.FloatTensor(self.action[ind]).to(self.device),
+            torch.FloatTensor(self.next_state[ind]).to(self.device),
+            torch.FloatTensor(self.reward[ind]).to(self.device),
+            torch.FloatTensor(self.not_done[ind]).to(self.device)
+        )

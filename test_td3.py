@@ -67,13 +67,13 @@ for eps in range(TOTAL_EPISODES):
 
 
         action = agent.choose_action(state, random_action and not EVALUATE, noise=not EVALUATE)        
-        v = (action[0]+1)/2 * np.linalg.norm(env.action_space.high)        
-        theta = action[1] * math.pi
+        v = action[0] * np.linalg.norm(env.action_space.high)        
+        theta = action[1] * math.pi/2
         converted_action = np.array([v*math.cos(theta), v*math.sin(theta)])
         
-        new_state, reward, done, info = env.step(action * env.action_space.high)                        
+        new_state, reward, done, info = env.step(converted_action)                        
                 
-        agent.remember(state, action, reward, new_state, done)                
+        agent.remember(state, action, new_state, reward, done)                
 
         if total_steps > WARM_UP_STEPS and not EVALUATE:                       
             actor_loss, critic_1_loss, critic_2_loss = agent.learn()
@@ -87,10 +87,10 @@ for eps in range(TOTAL_EPISODES):
         eps_steps += 1
         print("Steps = %d, Reward = %.3f, Score = %.3f" % (steps, reward, score), end='\r')        
         env.render()                
-        if done:
-            state, info = env.reset(return_info=True)
+        if done:            
             break
     
+    state, info = env.reset(return_info=True)
     eps_t = time.time() - eps_t
     steps_per_sec = eps_steps / eps_t
     sys.stdout.write("\033[K")

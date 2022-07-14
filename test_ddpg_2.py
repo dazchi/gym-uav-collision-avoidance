@@ -71,19 +71,18 @@ for eps in range(TOTAL_EPISODES):
 
 
         action = ddpg.choose_action(state, random_action and not EVALUATE, noise=not EVALUATE)        
-        v = (action[0]+1)/2 * np.linalg.norm(env.action_space.high)        
-        theta = action[1] * math.pi
+        v = action[0] * np.linalg.norm(env.action_space.high)        
+        theta = action[1] * math.pi/2
         converted_action = np.array([v*math.cos(theta), v*math.sin(theta)])
         
-        new_state, reward, done, info = env.step(action * env.action_space.high)                        
+        new_state, reward, done, info = env.step(converted_action)                        
                 
         ddpg.remember(state, action, new_state, reward, done)                
 
         if total_steps > WARM_UP_STEPS and not EVALUATE:                       
-            # actor_loss, critic_loss = ddpg.learn()
-            ddpg.learn()
-            # tb_writer.add_scalar("Actor Loss/Steps", actor_loss, total_steps)
-            # tb_writer.add_scalar("Critic Loss/Steps", critic_loss, total_steps)
+            actor_loss, critic_loss = ddpg.learn()            
+            tb_writer.add_scalar("Actor Loss/Steps", actor_loss, total_steps)
+            tb_writer.add_scalar("Critic Loss/Steps", critic_loss, total_steps)
                                                 
         state = new_state
         score += reward
@@ -91,10 +90,10 @@ for eps in range(TOTAL_EPISODES):
         eps_steps += 1
         print("Steps = %d, Reward = %.3f, Score = %.3f" % (steps, reward, score), end='\r')        
         env.render()                
-        if done:
-            state, info = env.reset(return_info=True)
+        if done:           
             break
     
+    state, info = env.reset(return_info=True)
     eps_t = time.time() - eps_t
     steps_per_sec = eps_steps / eps_t
     sys.stdout.write("\033[K")
@@ -103,8 +102,8 @@ for eps in range(TOTAL_EPISODES):
 
     # print(torch.cuda.memory_summary())
 
-    # if not EVALUATE:
-    #     # ddpg.save_weights(total_steps, eps,MODEL_PATH)
+    if not EVALUATE:
+        ddpg.save_weights(total_steps, eps,MODEL_PATH)
 
     tb_writer.flush()
 

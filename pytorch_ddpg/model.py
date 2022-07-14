@@ -23,7 +23,7 @@ class ActorNetwork(nn.Module):
 
     def forward(self, state):        
         out = self.input(state)       
-        # out = self.bn1(out) 
+        out = self.bn1(out) 
         out = self.relu(out)
         out = self.fc1(out)
         out = self.relu(out)

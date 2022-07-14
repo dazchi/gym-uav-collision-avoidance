@@ -72,7 +72,7 @@ class TD3(object):
         action_dim,
         max_action,
         discount=0.99,
-        tau=0.005,
+        tau=0.001,
         policy_noise=0.2,
         noise_clip=0.5,
         policy_freq=2
@@ -80,11 +80,11 @@ class TD3(object):
 
         self.actor = Actor(state_dim, action_dim, max_action).to(device)
         self.actor_target = copy.deepcopy(self.actor)
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=3e-4)
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=1e-3)
 
         self.critic = Critic(state_dim, action_dim).to(device)
         self.critic_target = copy.deepcopy(self.critic)
-        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=3e-4)
+        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=1e-3)
 
         self.max_action = max_action
         self.discount = discount
@@ -94,6 +94,7 @@ class TD3(object):
         self.policy_freq = policy_freq
 
         self.total_it = 0
+        self.last_actor_loss = 0
 
 
     def select_action(self, state):
@@ -101,7 +102,7 @@ class TD3(object):
         return self.actor(state).cpu().data.numpy().flatten()
 
 
-    def train(self, replay_buffer, batch_size=256):
+    def train(self, replay_buffer, batch_size=100):
         self.total_it += 1
 
         # Sample replay buffer 
@@ -153,24 +154,48 @@ class TD3(object):
             for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
                 target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
             
+            self.last_actor_loss = actor_loss.item()
+
+        return self.last_actor_loss, critic_loss.item()
+        
+                
+        
+
+    def load_weights(self, output):
+        if output is None: return
+
+        actor_checkpoint = torch.load('{}/td3_actor.chpt'.format(output))
+        critic_checkpoint = torch.load('{}/td3_critic.chpt'.format(output))
 
 
-    def save(self, filename):
-        torch.save(self.critic.state_dict(), filename + "_critic")
-        torch.save(self.critic_optimizer.state_dict(), filename + "_critic_optimizer")
+        self.actor.load_state_dict(actor_checkpoint['model_state_dict'])        
+        self.actor_target.load_state_dict(actor_checkpoint['target_model_state_dict'])
+        self.actor_optimizer.load_state_dict(actor_checkpoint['optimizer_state_dict'])
+        self.critic_1.load_state_dict(critic_checkpoint['model_state_dict'])        
+        self.critic_1_target.load_state_dict(critic_checkpoint['target_model_state_dict'])
+        self.critic_1_optimizer.load_state_dict(critic_checkpoint['optimizer_state_dict'])
 
-        torch.save(self.actor.state_dict(), filename + "_actor")
-        torch.save(self.actor_optimizer.state_dict(), filename + "_actor_optimizer")
+        
+        return actor_checkpoint['steps'], actor_checkpoint['episodes']
+    
+    def save_weights(self, steps, episodes, output):
+        torch.save({
+                'steps': steps,
+                'episodes': episodes,
+                'model_state_dict': self.actor.state_dict(),
+                'target_model_state_dict': self.actor_target.state_dict(),
+                'optimizer_state_dict': self.actor_optimizer.state_dict(),
+            },'{}/td3_actor.chpt'.format(output))
 
+        torch.save({
+                'steps': steps,
+                'episodes': episodes,
+                'model_state_dict': self.critic.state_dict(),
+                'target_model_state_dict': self.critic_target.state_dict(),
+                'optimizer_state_dict': self.critic_optimizer.state_dict(),
+            },'{}/td3_critic.chpt'.format(output))
 
-    def load(self, filename):
-        self.critic.load_state_dict(torch.load(filename + "_critic"))
-        self.critic_optimizer.load_state_dict(torch.load(filename + "_critic_optimizer"))
-        self.critic_target = copy.deepcopy(self.critic)
-
-        self.actor.load_state_dict(torch.load(filename + "_actor"))
-        self.actor_optimizer.load_state_dict(torch.load(filename + "_actor_optimizer"))
-        self.actor_target = copy.deepcopy(self.actor)
+  
 
 class ReplayBuffer(object):
     def __init__(self, state_dim, action_dim, max_size=int(1e6)):
