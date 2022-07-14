@@ -160,7 +160,7 @@ class UAVWorld2D(gym.Env):
             reward += 1000
         elif (clipped_location != self._agent_location).any():  # An episode is done if the agent has gone out of box            
             done = True            
-            reward -= 1500                        
+            # reward -= 1500                        
         else:
             done = False
           

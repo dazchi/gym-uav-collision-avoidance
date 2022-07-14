@@ -100,8 +100,6 @@ class MultiUAVWorld2D(gym.Env):
         normalized_relative_obs2_direction = relative_obs2_direction / math.pi
 
         
-    
-
         return np.array([
                             normalized_agent_speed,
                             normalized_agent_theta,
@@ -178,15 +176,15 @@ class MultiUAVWorld2D(gym.Env):
         n_reward = []
         n_done = []        
         for i in range(self.num_agents):
-            # Check collision
-            collision = False
-            for j in range(self.num_agents):
-                target_agent = self.agent_list[j]
-                if self.agent_list[i] == target_agent:
-                    continue
-                if np.linalg.norm(target_agent.location - self.agent_list[i].location) <= 2 * self.collider_radius:
-                    collision = True
+            reward = 0
 
+            uav_in_range = self.agent_list[i].uavs_in_range(self.agent_list, self.d_sense)
+            for j in range(min(2, len(uav_in_range))):                
+                target_agent = uav_in_range[j]
+                distance = np.linalg.norm(target_agent.location - self.agent_list[i].location)
+                reward -= 0.1* (self.d_sense / (distance + 2 * self.collider_radius))
+                if distance <= 2*self.collider_radius:
+                    reward -=10
 
             max_speed = np.linalg.norm(self.agent_list[i].max_speed)
             distance = np.linalg.norm(self.agent_list[i].target_location - self.agent_list[i].location)  
@@ -194,16 +192,14 @@ class MultiUAVWorld2D(gym.Env):
                 (self.agent_list[i].target_location - self.agent_list[i].location)[0]) - math.atan2(self.agent_list[i].velocity[1], self.agent_list[i].velocity[0])
             delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta))                 
             
-            reward = 0
+            
             reward += 20 * ((self.agent_list[i].prev_distance - distance) / max_speed)
             if reward > 0:
                 reward *= 1 - (distance/(1.5*self.agent_list[i].init_distance))
             else:
                 reward *= 1 + (distance/(1.5*self.agent_list[i].init_distance))
             reward -= 0.1 * abs(delta_theta)
-                      
-            if collision:
-                reward -= 0.5
+         
 
             reward -= 0.1    
          
@@ -212,9 +208,9 @@ class MultiUAVWorld2D(gym.Env):
             if distance < 0.5:  # An episode is done if the agent has reached the target        
                 done = True            
                 reward += 100
-            elif (clipped_location != self.agent_list[i].location).any():  # An episode is done if the agent has gone out of box            
+            elif distance > self.map_diagonal_size:  # An episode is done if the agent has gone out of box            
                 done = True            
-                # reward -= 100            
+                reward -= 100 
             else:
                 done = False
             
