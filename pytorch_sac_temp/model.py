@@ -18,9 +18,9 @@ class ValueNetwork(nn.Module):
     def __init__(self, num_inputs):
         super(ValueNetwork, self).__init__()
 
-        self.linear1 = nn.Linear(num_inputs, 600)
-        self.linear2 = nn.Linear(600, 300)
-        self.linear3 = nn.Linear(300, 1)
+        self.linear1 = nn.Linear(num_inputs, 256)
+        self.linear2 = nn.Linear(256, 256)
+        self.linear3 = nn.Linear(256, 1)
 
         self.apply(weights_init_)
 
@@ -36,14 +36,14 @@ class QNetwork(nn.Module):
         super(QNetwork, self).__init__()
 
         # Q1 architecture
-        self.linear1 = nn.Linear(num_inputs + num_actions, 600)
-        self.linear2 = nn.Linear(600, 300)
-        self.linear3 = nn.Linear(300, 1)
+        self.linear1 = nn.Linear(num_inputs + num_actions, 256)
+        self.linear2 = nn.Linear(256, 256)
+        self.linear3 = nn.Linear(256, 1)
 
         # Q2 architecture
-        self.linear4 = nn.Linear(num_inputs + num_actions, 600)
-        self.linear5 = nn.Linear(600, 300)
-        self.linear6 = nn.Linear(300, 1)
+        self.linear4 = nn.Linear(num_inputs + num_actions, 256)
+        self.linear5 = nn.Linear(256, 256)
+        self.linear6 = nn.Linear(256, 1)
 
         self.apply(weights_init_)
 
@@ -65,11 +65,11 @@ class GaussianPolicy(nn.Module):
     def __init__(self, num_inputs, num_actions):
         super(GaussianPolicy, self).__init__()
         
-        self.linear1 = nn.Linear(num_inputs, 600)
-        self.linear2 = nn.Linear(600, 300)
+        self.linear1 = nn.Linear(num_inputs, 256)
+        self.linear2 = nn.Linear(256, 256)
 
-        self.mean_linear = nn.Linear(300, num_actions)
-        self.log_std_linear = nn.Linear(300, num_actions)
+        self.mean_linear = nn.Linear(256, num_actions)
+        self.log_std_linear = nn.Linear(256, num_actions)
 
         self.apply(weights_init_)
 

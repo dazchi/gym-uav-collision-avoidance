@@ -85,7 +85,8 @@ for eps in range(TOTAL_EPISODES):
             for i in range(UPDATE_PER_STEP):
                 # Update parameters of all the networks
                 critic_1_loss, critic_2_loss, policy_loss, ent_loss, alpha = agents[0].update_parameters(memory, BATCH_SIZE, updates)
-
+                for i in range(1, NUM_AGENTS):            
+                    agents[i].policy.load_state_dict(agents[0].policy.state_dict())
                 tb_writer.add_scalar('loss/critic_1', critic_1_loss, updates)
                 tb_writer.add_scalar('loss/critic_2', critic_2_loss, updates)
                 tb_writer.add_scalar('loss/policy', policy_loss, updates)
@@ -96,8 +97,8 @@ for eps in range(TOTAL_EPISODES):
         next_states, rewards, dones, _ = env.step(converted_actions) # Step
     
         memory.push(states[0], actions[0], rewards[0], next_states[0], float(not dones[0])) # Append transition to memory                                                                                 
-        # for i in range(1, NUM_AGENTS):            
-        #     memory.push(states[i], actions[i], rewards[i], next_states[i], float(not dones[i])) # Append transition to memory                                                                                 
+        for i in range(1, NUM_AGENTS):            
+            memory.push(states[i], actions[i], rewards[i], next_states[i], float(not dones[i])) # Append transition to memory                                                                                 
                                                       
         states = next_states
         score += rewards[0]
@@ -123,8 +124,7 @@ for eps in range(TOTAL_EPISODES):
 
     if not EVALUATE:
         agents[0].save_checkpoint(MODEL_PATH)
-        for i in range(1, NUM_AGENTS):            
-            agents[i].policy.load_state_dict(agents[0].policy.state_dict())
+        
 
     tb_writer.flush()
 

@@ -183,6 +183,7 @@ class MultiUAVWorld2D(gym.Env):
             delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta))                 
                         
             reward = 0
+            reward -= 0.01 * min(max_speed / self.agent_list[i].init_distance, 1)
             reward += 100 * ((prev_distance - distance) / max_speed)
             if reward > 0:
                 reward *= 1 - (distance/(1.5*self.agent_list[i].init_distance))
@@ -194,10 +195,10 @@ class MultiUAVWorld2D(gym.Env):
             for j in range(min(2, len(uav_in_range))):                
                 target_agent = uav_in_range[j]
                 obs_distance = np.linalg.norm(target_agent.location - self.agent_list[i].location)
-                reward -= 0.05 * (self.d_sense / (obs_distance + 2 * self.collider_radius))
+                # reward -= 0.05 * (self.d_sense / (obs_distance + 2 * self.collider_radius))
                 if obs_distance <= 2*self.collider_radius:
-                    reward -= 0.1         
-            reward -= 0.001
+                    reward = -3         
+            
                     
             clipped_location = np.clip(self.agent_list[i].location, self.min_location , self.max_location)
 
