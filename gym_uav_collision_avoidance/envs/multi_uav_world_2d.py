@@ -46,8 +46,9 @@ class MultiUAVWorld2D(gym.Env):
             self.agent_list.append(UAVAgent(color=color, max_speed=max_speed, max_acceleraion=max_acceleration, tau=self.tau))            
                 
                
-        self.observation_space = spaces.Box(np.array([0,-1,0,-1,0,-1,-1,0,-1,1]),
-                                            np.array([1,1,1,1,1,1,1,1,1,1]), shape=(10,), dtype=np.float32)       
+        # self.observation_space = spaces.Box(np.array([0,-1,0,-1,0,-1,-1,0,-1,1]),
+        #                                     np.array([1,1,1,1,1,1,1,1,1,1]), shape=(10,), dtype=np.float32) 
+        self.observation_space = spaces.Box(np.array([0.,-1.,0.,-1.]), np.array([1.,1.,1.,1.]), shape=(4,), dtype=np.float32)      
         self.action_space = spaces.Box(-max_speed, max_speed, shape=(2,), dtype=np.float32)
 
         
@@ -61,8 +62,7 @@ class MultiUAVWorld2D(gym.Env):
         self.window = None
         self.clock = None
 
-    def _get_obs(self, agent):
-        
+    def _get_obs(self, agent):            
         # Agent State
         normalized_agent_speed = np.linalg.norm(agent.velocity) / np.linalg.norm(agent.max_speed)
         agent_theta =  math.atan2(agent.velocity[1],agent.velocity[0])
@@ -76,28 +76,28 @@ class MultiUAVWorld2D(gym.Env):
         delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta)) 
         normalized_delta_theta = delta_theta / math.pi
 
-        # Obstacle States
-        obstacles = agent.uavs_in_range(self.agent_list, self.d_sense)
+        # # Obstacle States
+        # obstacles = agent.uavs_in_range(self.agent_list, self.d_sense)
         
-        normalized_obs1_relative_distance = (np.linalg.norm(obstacles[0].location - agent.location) / self.d_sense) if len(obstacles) > 0 else 1
-        relative_obs1_theta = (math.atan2((obstacles[0].location - agent.location)[1],(obstacles[0].location - agent.location)[0])) if len(obstacles) > 0 else (math.pi + agent_theta)
-        delta_theta_obs1 = relative_obs1_theta - agent_theta
-        delta_theta_obs1 = math.atan2(math.sin(delta_theta_obs1), math.cos(delta_theta_obs1))
-        normalized_delta_theta_obs1 = delta_theta_obs1 / math.pi
-        obs1_direction = (math.atan2(obstacles[0].velocity[1],obstacles[0].velocity[0])) if len(obstacles) > 0 else (agent_theta)
-        relative_obs1_direction = obs1_direction - agent_theta
-        relative_obs1_direction = math.atan2(math.sin(relative_obs1_direction), math.cos(relative_obs1_direction))
-        normalized_relative_obs1_direction = relative_obs1_direction / math.pi
+        # normalized_obs1_relative_distance = (np.linalg.norm(obstacles[0].location - agent.location) / self.d_sense) if len(obstacles) > 0 else 1
+        # relative_obs1_theta = (math.atan2((obstacles[0].location - agent.location)[1],(obstacles[0].location - agent.location)[0])) if len(obstacles) > 0 else (math.pi + agent_theta)
+        # delta_theta_obs1 = relative_obs1_theta - agent_theta
+        # delta_theta_obs1 = math.atan2(math.sin(delta_theta_obs1), math.cos(delta_theta_obs1))
+        # normalized_delta_theta_obs1 = delta_theta_obs1 / math.pi
+        # obs1_direction = (math.atan2(obstacles[0].velocity[1],obstacles[0].velocity[0])) if len(obstacles) > 0 else (agent_theta)
+        # relative_obs1_direction = obs1_direction - agent_theta
+        # relative_obs1_direction = math.atan2(math.sin(relative_obs1_direction), math.cos(relative_obs1_direction))
+        # normalized_relative_obs1_direction = relative_obs1_direction / math.pi
 
-        normalized_obs2_relative_distance = (np.linalg.norm(obstacles[1].location - agent.location) / self.d_sense) if len(obstacles) > 1 else 1
-        relative_obs2_theta = (math.atan2((obstacles[1].location - agent.location)[1],(obstacles[1].location - agent.location)[0])) if len(obstacles) > 1 else (math.pi + agent_theta)
-        delta_theta_obs2 = relative_obs2_theta - agent_theta
-        delta_theta_obs2 = math.atan2(math.sin(delta_theta_obs2), math.cos(delta_theta_obs2))
-        normalized_delta_theta_obs2 = delta_theta_obs2 / math.pi
-        obs2_direction = (math.atan2(obstacles[1].velocity[1],obstacles[1].velocity[0])) if len(obstacles) > 1 else (agent_theta)
-        relative_obs2_direction = obs2_direction - agent_theta
-        relative_obs2_direction = math.atan2(math.sin(relative_obs2_direction), math.cos(relative_obs2_direction))
-        normalized_relative_obs2_direction = relative_obs2_direction / math.pi
+        # normalized_obs2_relative_distance = (np.linalg.norm(obstacles[1].location - agent.location) / self.d_sense) if len(obstacles) > 1 else 1
+        # relative_obs2_theta = (math.atan2((obstacles[1].location - agent.location)[1],(obstacles[1].location - agent.location)[0])) if len(obstacles) > 1 else (math.pi + agent_theta)
+        # delta_theta_obs2 = relative_obs2_theta - agent_theta
+        # delta_theta_obs2 = math.atan2(math.sin(delta_theta_obs2), math.cos(delta_theta_obs2))
+        # normalized_delta_theta_obs2 = delta_theta_obs2 / math.pi
+        # obs2_direction = (math.atan2(obstacles[1].velocity[1],obstacles[1].velocity[0])) if len(obstacles) > 1 else (agent_theta)
+        # relative_obs2_direction = obs2_direction - agent_theta
+        # relative_obs2_direction = math.atan2(math.sin(relative_obs2_direction), math.cos(relative_obs2_direction))
+        # normalized_relative_obs2_direction = relative_obs2_direction / math.pi
 
         
         return np.array([
@@ -105,12 +105,12 @@ class MultiUAVWorld2D(gym.Env):
                             normalized_agent_theta,
                             normalized_target_distance,
                             normalized_delta_theta,
-                            normalized_obs1_relative_distance,
-                            normalized_delta_theta_obs1,
-                            normalized_relative_obs1_direction,
-                            normalized_obs2_relative_distance,
-                            normalized_delta_theta_obs2,
-                            normalized_relative_obs2_direction,                            
+                            # normalized_obs1_relative_distance,
+                            # normalized_delta_theta_obs1,
+                            # normalized_relative_obs1_direction,
+                            # normalized_obs2_relative_distance,
+                            # normalized_delta_theta_obs2,
+                            # normalized_relative_obs2_direction,                            
                         ])        
 
     def _get_info(self):
@@ -137,6 +137,7 @@ class MultiUAVWorld2D(gym.Env):
         for i in range(self.num_agents):            
             self.agent_list[i].velocity = np.random.uniform(self.min_speed, high=self.max_speed, size=(2,)).astype(np.float32)        
             self.agent_list[i].velocity_prev = self.agent_list[i].velocity
+            self.agent_list[i].done = False
             # self.agent_list[i].velocity = np.zeros(2)
             # self.agent_list[i].velocity_prev = self.agent_list[i].velocity
 
@@ -170,47 +171,41 @@ class MultiUAVWorld2D(gym.Env):
         return (n_observation, info) if return_info else n_observation
 
     def step(self, n_action):           
-        for i in range(self.num_agents):
-            self.agent_list[i].step(n_action[i])
-        
         n_reward = []
-        n_done = []        
-        for i in range(self.num_agents):
-            reward = 0
-
-            uav_in_range = self.agent_list[i].uavs_in_range(self.agent_list, self.d_sense)
-            for j in range(min(2, len(uav_in_range))):                
-                target_agent = uav_in_range[j]
-                distance = np.linalg.norm(target_agent.location - self.agent_list[i].location)
-                reward -= 0.1* (self.d_sense / (distance + 2 * self.collider_radius))
-                if distance <= 2*self.collider_radius:
-                    reward -=10
-
-            max_speed = np.linalg.norm(self.agent_list[i].max_speed)
-            distance = np.linalg.norm(self.agent_list[i].target_location - self.agent_list[i].location)  
+        n_done = []   
+                 
+        for i in range(self.num_agents):                        
+            prev_distance, distance = self.agent_list[i].step(n_action[i])
+            max_speed = np.linalg.norm(self.agent_list[i].max_speed)          
             delta_theta = math.atan2((self.agent_list[i].target_location - self.agent_list[i].location)[1],
                 (self.agent_list[i].target_location - self.agent_list[i].location)[0]) - math.atan2(self.agent_list[i].velocity[1], self.agent_list[i].velocity[0])
             delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta))                 
-            
-            
-            reward += 20 * ((self.agent_list[i].prev_distance - distance) / max_speed)
+                        
+            reward = 0
+            reward += 100 * ((prev_distance - distance) / max_speed)
             if reward > 0:
                 reward *= 1 - (distance/(1.5*self.agent_list[i].init_distance))
             else:
                 reward *= 1 + (distance/(1.5*self.agent_list[i].init_distance))
-            reward -= 0.1 * abs(delta_theta)
-         
+            reward -= 0.01 * abs(delta_theta)
 
-            reward -= 0.1    
-         
+            uav_in_range = self.agent_list[i].uavs_in_range(self.agent_list, self.d_sense)
+            for j in range(min(2, len(uav_in_range))):                
+                target_agent = uav_in_range[j]
+                obs_distance = np.linalg.norm(target_agent.location - self.agent_list[i].location)
+                reward -= 0.05 * (self.d_sense / (obs_distance + 2 * self.collider_radius))
+                if obs_distance <= 2*self.collider_radius:
+                    reward -= 0.1         
+            reward -= 0.001
+                    
             clipped_location = np.clip(self.agent_list[i].location, self.min_location , self.max_location)
 
             if distance < 0.5:  # An episode is done if the agent has reached the target        
                 done = True            
+                self.agent_list[i].finish()
                 reward += 100
-            elif distance > self.map_diagonal_size:  # An episode is done if the agent has gone out of box            
-                done = True            
-                reward -= 100 
+            elif (clipped_location != self.agent_list[i].location).any():  # An episode is done if the agent has gone out of box            
+                done = True                            
             else:
                 done = False
             

@@ -14,11 +14,11 @@ from torchviz import make_dot
 
 
 MODEL_PATH = './weights/sac'
-WARM_UP_STEPS = 3000
-MAX_EPISOED_STEPS = 3000
+WARM_UP_STEPS = 10000
+MAX_EPISOED_STEPS = 2000
 TOTAL_EPISODES = 1000
 BATCH_SIZE = 256
-EVALUATE = True
+EVALUATE = False
 UPDATE_PER_STEP = 1
 LOAD_MODEL = False
 
@@ -74,7 +74,7 @@ for eps in range(TOTAL_EPISODES):
         else:
             action = agent.select_action(state, evaluate=EVALUATE)
         
-        v = (action[0]/2+0.5) * np.linalg.norm(env.action_space.high)     
+        v = (action[0]/2+0.5) * env.action_space.high[0]
         theta = action[1] * math.pi
         
         converted_action = np.array([v*math.cos(theta), v*math.sin(theta)])

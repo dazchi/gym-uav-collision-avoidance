@@ -14,14 +14,14 @@ from torchviz import make_dot
 
 
 MODEL_PATH = './weights/sac_multi'
-WARM_UP_STEPS = 10000
+WARM_UP_STEPS = 4000
 MAX_EPISOED_STEPS = 2000
 TOTAL_EPISODES = 10000
 BATCH_SIZE = 256
 EVALUATE = False
 UPDATE_PER_STEP = 1
 LOAD_MODEL = False
-NUM_AGENTS = 5
+NUM_AGENTS = 1
 EPSILON_GREEDY = 0.95
 
 
@@ -37,14 +37,11 @@ tb_writer = SummaryWriter()
 
 n_observations = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
+agent = SAC(n_observations, n_actions)
 
-agents = []
-for i in range(NUM_AGENTS):
-    agents.append(SAC(n_observations, n_actions))
 
 if EVALUATE or LOAD_MODEL:    
-    for i in range(NUM_AGENTS):
-        agents[i].load_checkpoint(MODEL_PATH, EVALUATE)
+    agent.load_checkpoint(MODEL_PATH, EVALUATE)
     
 # o = torch.zeros(2,n_observations, dtype=torch.float, requires_grad=False, device=device)
 # a = torch.zeros(2,n_actions, dtype=torch.float, requires_grad=False, device=device)
@@ -57,34 +54,37 @@ if EVALUATE or LOAD_MODEL:
 memory = ReplayMemory(int(1e6))
 updates = 0
 total_steps = 0
-states, _ = env.reset(return_info=True)
+n_state, _ = env.reset(return_info=True)
+
 for eps in range(TOTAL_EPISODES): 
     score = 0
     eps_t = time.time()
     eps_steps = 0
+
     for steps in range(MAX_EPISOED_STEPS):
-        actions = []
-        converted_actions = []
+        # random_action = (not LOAD_MODEL and (total_steps < WARM_UP_STEPS)) or (random.random() > EPSILON_GREEDY + (1-EPSILON_GREEDY)*eps/TOTAL_EPISODES) 
 
-        for i in range(NUM_AGENTS):                
-            if total_steps < WARM_UP_STEPS and not EVALUATE: 
-                action = np.random.uniform(low=-1, high=1, size=(n_actions,))                       
-            else:
-                action = agents[i].select_action(states[i], evaluate=EVALUATE)        
-
-            v = (action[0]/2+0.5) * np.linalg.norm(env.action_space.high)     
-            theta = action[1] * math.pi
-        
-            converted_action = np.array([v*math.cos(theta), v*math.sin(theta)])
+        n_action = []
+        n_action_converted = []
+        for i in range(NUM_AGENTS):
             
-            actions.append(action)
-            converted_actions.append(converted_action)
-        
+            if total_steps < WARM_UP_STEPS and not EVALUATE: 
+                action = np.random.uniform(low=-1, high=1, size=(n_actions,))         
+            else:
+                action = agent.select_action(n_state[i], evaluate=EVALUATE)            
+            
+            v = (action[0]/2+0.5) * np.linalg.norm(env.action_space.high)     
+            theta = action[1] * math.pi        
+            converted_action = np.array([v*math.cos(theta), v*math.sin(theta)])
+
+            n_action.append(action)
+            n_action_converted.append(converted_action)
+               
         if len(memory) > BATCH_SIZE and not EVALUATE:
              # Number of updates per step in environment
             for i in range(UPDATE_PER_STEP):
                 # Update parameters of all the networks
-                critic_1_loss, critic_2_loss, policy_loss, ent_loss, alpha = agents[0].update_parameters(memory, BATCH_SIZE, updates)
+                critic_1_loss, critic_2_loss, policy_loss, ent_loss, alpha = agent.update_parameters(memory, BATCH_SIZE, updates)
 
                 tb_writer.add_scalar('loss/critic_1', critic_1_loss, updates)
                 tb_writer.add_scalar('loss/critic_2', critic_2_loss, updates)
@@ -93,24 +93,21 @@ for eps in range(TOTAL_EPISODES):
                 tb_writer.add_scalar('entropy_temprature/alpha', alpha, updates)
                 updates += 1
 
-        next_states, rewards, dones, _ = env.step(converted_actions) # Step
-    
-        memory.push(states[0], actions[0], rewards[0], next_states[0], float(not dones[0])) # Append transition to memory                                                                                 
-        for i in range(1, NUM_AGENTS):            
-            memory.push(states[i], actions[i], rewards[i], next_states[i], float(not dones[i])) # Append transition to memory                                                                                 
-                                                      
-        states = next_states
-        score += rewards[0]
+        n_next_state, n_reward, n_done, _ = env.step(n_action_converted) # Step
+        mask = float(not n_done[0])
+
+        memory.push(n_state[0], n_action[0], n_reward[0], n_next_state[0], mask) # Append transition to memory
+        # for i in range(NUM_AGENTS):                                                                          
+        #     memory.push(n_state[i], n_action[i], n_reward[i], n_next_state[i], float(not n_done[i])) # Append transition to memory
+
+        state = n_next_state
+        score += n_reward[0]
         total_steps += 1   
         eps_steps += 1
-        print("Steps = %d, Reward = %.3f, Score = %.3f" % (steps, rewards[0], score), end='\r')        
-        env.render()       
-        if not EVALUATE:            
-            if dones[0]:            
-                break
-        else:
-            if all(dones):
-                break
+        print("Steps = %d, Reward = %.3f, Score = %.3f" % (steps, n_reward[0], score), end='\r')        
+        env.render()                
+        if n_done[0]:            
+            break
     
     state, info = env.reset(return_info=True)
     eps_t = time.time() - eps_t
@@ -122,13 +119,14 @@ for eps in range(TOTAL_EPISODES):
     # print(torch.cuda.memory_summary())
 
     if not EVALUATE:
-        agents[0].save_checkpoint(MODEL_PATH)
-        for i in range(1, NUM_AGENTS):            
-            agents[i].policy.load_state_dict(agents[0].policy.state_dict())
+        agent.save_checkpoint(MODEL_PATH)        
 
     tb_writer.flush()
 
-    
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
+    gc.collect()    
+
 
 env.close()
 tb_writer.close()

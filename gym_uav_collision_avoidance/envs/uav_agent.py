@@ -1,3 +1,4 @@
+from math import fabs
 import gym
 import pygame
 import numpy as np
@@ -14,15 +15,27 @@ class UAVAgent():
         self.target_location = np.zeros(2)
         self.init_distance = 0
         self.prev_distance = 0
+        self.done = False
     
     
     def step(self, action):
+        if self.done:
+            return 0, 0
         dv = np.clip((action - self.velocity_prev)/self.tau, -self.max_acceleration, self.max_acceleration)
         self.velocity = np.clip(self.velocity_prev + dv * self.tau, -self.max_speed, self.max_speed)
         dx = self.velocity * self.tau        
         self.location += dx
         self.velocity_prev = self.velocity
-    
+
+        prev_distance = self.prev_distance
+        distance = np.linalg.norm(self.target_location - self.location)
+        self.prev_distance = distance
+
+        return prev_distance, distance
+
+    def finish(self):
+        self.done = True                
+
     def uavs_in_range(self, uav_agents, d_sense=30):
         uavs = []
         relative_distances = []

@@ -85,7 +85,7 @@ class UAVWorld2D(gym.Env):
         # delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta)) 
         # normalized_delta_theta = delta_theta / math.pi
 
-        normalized_agent_speed = np.linalg.norm(self._agent_speed) / np.linalg.norm(self.max_speed)
+        normalized_agent_speed = np.linalg.norm(self._agent_speed) / self.max_speed[0]
         agent_theta =  math.atan2(self._agent_speed[1],self._agent_speed[0])
         normalized_agent_theta = agent_theta / math.pi
         relative_target_theta = math.atan2((self._target_location - self._agent_location)[1],(self._target_location - self._agent_location)[0])
@@ -140,7 +140,8 @@ class UAVWorld2D(gym.Env):
         # action_noise = np.random.normal(np.zeros_like(action), self.max_speed * 0.01)        
         # action += action_noise
         dv = np.clip((action - self._agent_speed_prev)/self.tau, self.min_acceleratoin, self.max_acceleratoin)
-        self._agent_speed = self._agent_speed_prev + dv * self.tau
+        # self._agent_speed = self._agent_speed_prev + dv * self.tau
+        self._agent_speed = np.clip(self._agent_speed_prev + dv * self.tau, -self.max_speed, self.max_speed)
         dx = self._agent_speed * self.tau        
         self._agent_location += dx
         self._agent_speed_prev = self._agent_speed
@@ -159,7 +160,7 @@ class UAVWorld2D(gym.Env):
             done = True            
             reward += 1000
         elif (clipped_location != self._agent_location).any():  # An episode is done if the agent has gone out of box            
-            done = True            
+            done = True                     
             # reward -= 1500                        
         else:
             done = False
