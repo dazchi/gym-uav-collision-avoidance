@@ -46,9 +46,9 @@ class MultiUAVWorld2D(gym.Env):
             self.agent_list.append(UAVAgent(color=color, max_speed=max_speed, max_acceleraion=max_acceleration, tau=self.tau))            
                 
                
-        # self.observation_space = spaces.Box(np.array([0,-1,0,-1,0,-1,-1,0,-1,1]),
-        #                                     np.array([1,1,1,1,1,1,1,1,1,1]), shape=(10,), dtype=np.float32) 
-        self.observation_space = spaces.Box(np.array([0.,-1.,0.,-1.]), np.array([1.,1.,1.,1.]), shape=(4,), dtype=np.float32)      
+        self.observation_space = spaces.Box(np.array([0,-1,0,-1,0,-1,-1,0,-1,1]),
+                                            np.array([1,1,1,1,1,1,1,1,1,1]), shape=(10,), dtype=np.float32) 
+        # self.observation_space = spaces.Box(np.array([0.,-1.,0.,-1.]), np.array([1.,1.,1.,1.]), shape=(4,), dtype=np.float32)      
         self.action_space = spaces.Box(-max_speed, max_speed, shape=(2,), dtype=np.float32)
 
         
@@ -76,28 +76,28 @@ class MultiUAVWorld2D(gym.Env):
         delta_theta = math.atan2(math.sin(delta_theta), math.cos(delta_theta)) 
         normalized_delta_theta = delta_theta / math.pi
 
-        # # Obstacle States
-        # obstacles = agent.uavs_in_range(self.agent_list, self.d_sense)
+        # Obstacle States
+        obstacles = agent.uavs_in_range(self.agent_list, self.d_sense)
         
-        # normalized_obs1_relative_distance = (np.linalg.norm(obstacles[0].location - agent.location) / self.d_sense) if len(obstacles) > 0 else 1
-        # relative_obs1_theta = (math.atan2((obstacles[0].location - agent.location)[1],(obstacles[0].location - agent.location)[0])) if len(obstacles) > 0 else (math.pi + agent_theta)
-        # delta_theta_obs1 = relative_obs1_theta - agent_theta
-        # delta_theta_obs1 = math.atan2(math.sin(delta_theta_obs1), math.cos(delta_theta_obs1))
-        # normalized_delta_theta_obs1 = delta_theta_obs1 / math.pi
-        # obs1_direction = (math.atan2(obstacles[0].velocity[1],obstacles[0].velocity[0])) if len(obstacles) > 0 else (agent_theta)
-        # relative_obs1_direction = obs1_direction - agent_theta
-        # relative_obs1_direction = math.atan2(math.sin(relative_obs1_direction), math.cos(relative_obs1_direction))
-        # normalized_relative_obs1_direction = relative_obs1_direction / math.pi
+        normalized_obs1_relative_distance = (np.linalg.norm(obstacles[0].location - agent.location) / self.d_sense) if len(obstacles) > 0 else 1
+        relative_obs1_theta = (math.atan2((obstacles[0].location - agent.location)[1],(obstacles[0].location - agent.location)[0])) if len(obstacles) > 0 else (math.pi + agent_theta)
+        delta_theta_obs1 = relative_obs1_theta - agent_theta
+        delta_theta_obs1 = math.atan2(math.sin(delta_theta_obs1), math.cos(delta_theta_obs1))
+        normalized_delta_theta_obs1 = delta_theta_obs1 / math.pi
+        obs1_direction = (math.atan2(obstacles[0].velocity[1],obstacles[0].velocity[0])) if len(obstacles) > 0 else (agent_theta)
+        relative_obs1_direction = obs1_direction - agent_theta
+        relative_obs1_direction = math.atan2(math.sin(relative_obs1_direction), math.cos(relative_obs1_direction))
+        normalized_relative_obs1_direction = relative_obs1_direction / math.pi
 
-        # normalized_obs2_relative_distance = (np.linalg.norm(obstacles[1].location - agent.location) / self.d_sense) if len(obstacles) > 1 else 1
-        # relative_obs2_theta = (math.atan2((obstacles[1].location - agent.location)[1],(obstacles[1].location - agent.location)[0])) if len(obstacles) > 1 else (math.pi + agent_theta)
-        # delta_theta_obs2 = relative_obs2_theta - agent_theta
-        # delta_theta_obs2 = math.atan2(math.sin(delta_theta_obs2), math.cos(delta_theta_obs2))
-        # normalized_delta_theta_obs2 = delta_theta_obs2 / math.pi
-        # obs2_direction = (math.atan2(obstacles[1].velocity[1],obstacles[1].velocity[0])) if len(obstacles) > 1 else (agent_theta)
-        # relative_obs2_direction = obs2_direction - agent_theta
-        # relative_obs2_direction = math.atan2(math.sin(relative_obs2_direction), math.cos(relative_obs2_direction))
-        # normalized_relative_obs2_direction = relative_obs2_direction / math.pi
+        normalized_obs2_relative_distance = (np.linalg.norm(obstacles[1].location - agent.location) / self.d_sense) if len(obstacles) > 1 else 1
+        relative_obs2_theta = (math.atan2((obstacles[1].location - agent.location)[1],(obstacles[1].location - agent.location)[0])) if len(obstacles) > 1 else (math.pi + agent_theta)
+        delta_theta_obs2 = relative_obs2_theta - agent_theta
+        delta_theta_obs2 = math.atan2(math.sin(delta_theta_obs2), math.cos(delta_theta_obs2))
+        normalized_delta_theta_obs2 = delta_theta_obs2 / math.pi
+        obs2_direction = (math.atan2(obstacles[1].velocity[1],obstacles[1].velocity[0])) if len(obstacles) > 1 else (agent_theta)
+        relative_obs2_direction = obs2_direction - agent_theta
+        relative_obs2_direction = math.atan2(math.sin(relative_obs2_direction), math.cos(relative_obs2_direction))
+        normalized_relative_obs2_direction = relative_obs2_direction / math.pi
 
         
         return np.array([
@@ -105,12 +105,12 @@ class MultiUAVWorld2D(gym.Env):
                             normalized_agent_theta,
                             normalized_target_distance,
                             normalized_delta_theta,
-                            # normalized_obs1_relative_distance,
-                            # normalized_delta_theta_obs1,
-                            # normalized_relative_obs1_direction,
-                            # normalized_obs2_relative_distance,
-                            # normalized_delta_theta_obs2,
-                            # normalized_relative_obs2_direction,                            
+                            normalized_obs1_relative_distance,
+                            normalized_delta_theta_obs1,
+                            normalized_relative_obs1_direction,
+                            normalized_obs2_relative_distance,
+                            normalized_delta_theta_obs2,
+                            normalized_relative_obs2_direction,                            
                         ])        
 
     def _get_info(self):
@@ -135,7 +135,8 @@ class MultiUAVWorld2D(gym.Env):
 
         # Choose UAV's initial speed
         for i in range(self.num_agents):            
-            self.agent_list[i].velocity = np.random.uniform(self.min_speed, high=self.max_speed, size=(2,)).astype(np.float32)        
+            # self.agent_list[i].velocity = np.random.uniform(self.min_speed, high=self.max_speed, size=(2,)).astype(np.float32)        
+            self.agent_list[i].velocity = np.zeros(2)        
             self.agent_list[i].velocity_prev = self.agent_list[i].velocity
             self.agent_list[i].done = False
             # self.agent_list[i].velocity = np.zeros(2)

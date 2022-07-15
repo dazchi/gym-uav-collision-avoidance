@@ -14,7 +14,7 @@ from torchviz import make_dot
 
 
 MODEL_PATH = './weights/sac_multi'
-WARM_UP_STEPS = 10000
+WARM_UP_STEPS = 4000
 MAX_EPISOED_STEPS = 2000
 TOTAL_EPISODES = 10000
 BATCH_SIZE = 256
@@ -96,8 +96,8 @@ for eps in range(TOTAL_EPISODES):
         next_states, rewards, dones, _ = env.step(converted_actions) # Step
     
         memory.push(states[0], actions[0], rewards[0], next_states[0], float(not dones[0])) # Append transition to memory                                                                                 
-        for i in range(1, NUM_AGENTS):            
-            memory.push(states[i], actions[i], rewards[i], next_states[i], float(not dones[i])) # Append transition to memory                                                                                 
+        # for i in range(1, NUM_AGENTS):            
+        #     memory.push(states[i], actions[i], rewards[i], next_states[i], float(not dones[i])) # Append transition to memory                                                                                 
                                                       
         states = next_states
         score += rewards[0]
