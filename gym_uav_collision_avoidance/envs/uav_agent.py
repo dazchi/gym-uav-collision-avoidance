@@ -34,7 +34,8 @@ class UAVAgent():
         return prev_distance, distance
 
     def finish(self):
-        self.done = True                
+        self.done = True
+        self.velocity = self.velocity / np.linalg.norm(self.velocity) * 0.001
 
     def uavs_in_range(self, uav_agents, d_sense=30):
         uavs = []

@@ -7,7 +7,7 @@ from pytorch_sac_temp.model import GaussianPolicy, QNetwork
 
 
 class SAC(object):
-    def __init__(self, n_states, n_actions, lr=3e-4, tau=5e-3, gamma=0.99, alpah=5, target_update_interval=1, automatic_entropy_tuning=True):
+    def __init__(self, n_states, n_actions, lr=3e-4, tau=5e-3, gamma=0.99, alpah=10, target_update_interval=1, automatic_entropy_tuning=True):
 
         self.lr = lr
         self.tau = tau

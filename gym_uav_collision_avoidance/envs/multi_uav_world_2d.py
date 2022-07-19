@@ -184,27 +184,30 @@ class MultiUAVWorld2D(gym.Env):
                         
             reward = 0
             reward -= 0.01 * min(max_speed / self.agent_list[i].init_distance, 1)
-            reward += 100 * ((prev_distance - distance) / max_speed)
+            reward += 50 * ((prev_distance - distance) / max_speed)
             if reward > 0:
                 reward *= 1 - (distance/(1.5*self.agent_list[i].init_distance))
             else:
                 reward *= 1 + (distance/(1.5*self.agent_list[i].init_distance))
             reward -= 0.01 * abs(delta_theta)
 
+            collision = False
             uav_in_range = self.agent_list[i].uavs_in_range(self.agent_list, self.d_sense)
             for j in range(min(2, len(uav_in_range))):                
                 target_agent = uav_in_range[j]
                 obs_distance = np.linalg.norm(target_agent.location - self.agent_list[i].location)
                 # reward -= 0.05 * (self.d_sense / (obs_distance + 2 * self.collider_radius))
                 if obs_distance <= 2*self.collider_radius:
-                    reward = -3         
+                    reward = -1   
+                    collision = True
             
                     
             clipped_location = np.clip(self.agent_list[i].location, self.min_location , self.max_location)
+            agent_speed = np.linalg.norm(self.agent_list[i].velocity)
 
-            if distance < 0.5:  # An episode is done if the agent has reached the target        
-                done = True            
-                self.agent_list[i].finish()
+            if distance < 0.5 and not collision and agent_speed < 0.2:  # An episode is done if the agent has reached the target        
+                done = True                          
+                self.agent_list[i].finish()     
                 reward += 100
             elif (clipped_location != self.agent_list[i].location).any():  # An episode is done if the agent has gone out of box            
                 done = True                            

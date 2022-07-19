@@ -2,6 +2,7 @@ import sys
 import os
 import random
 import time
+from turtle import done
 import torch
 import math
 import gc
@@ -15,10 +16,10 @@ from torchviz import make_dot
 
 MODEL_PATH = './weights/sac_multi'
 WARM_UP_STEPS = 4000
-MAX_EPISOED_STEPS = 2000
+MAX_EPISOED_STEPS = 3000
 TOTAL_EPISODES = 10000
 BATCH_SIZE = 256
-EVALUATE = False
+EVALUATE = True
 UPDATE_PER_STEP = 1
 LOAD_MODEL = False
 NUM_AGENTS = 5
@@ -67,10 +68,10 @@ for eps in range(TOTAL_EPISODES):
         converted_actions = []
 
         for i in range(NUM_AGENTS):                
-            if total_steps < WARM_UP_STEPS and not EVALUATE: 
+            if total_steps < WARM_UP_STEPS and not EVALUATE and not LOAD_MODEL: 
                 action = np.random.uniform(low=-1, high=1, size=(n_actions,))                       
             else:
-                action = agents[i].select_action(states[i], evaluate=EVALUATE)        
+                action = agents[i].select_action(states[i], evaluate=False)        
 
             v = (action[0]/2+0.5) * np.linalg.norm(env.action_space.high)     
             theta = action[1] * math.pi
@@ -110,6 +111,7 @@ for eps in range(TOTAL_EPISODES):
             if dones[0]:            
                 break
         else:
+            # print(dones)
             if all(dones):
                 break
     
