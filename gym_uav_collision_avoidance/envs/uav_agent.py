@@ -16,6 +16,7 @@ class UAVAgent():
         self.init_distance = 0
         self.prev_distance = 0
         self.done = False
+        self.collided = False        
     
     
     def step(self, action):

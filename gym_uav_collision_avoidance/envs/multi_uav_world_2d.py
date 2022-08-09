@@ -15,7 +15,7 @@ from gym_uav_collision_avoidance.envs.uav_agent import UAVAgent
 class MultiUAVWorld2D(gym.Env):
     metadata = {"render_fps": 1000}
 
-    def __init__(self, x_size=100.0, y_size=100.0, max_speed=12.0, max_acceleration=5.0, num_agents=4, collider_radius=2.5, d_sense=30):
+    def __init__(self, x_size=50.0, y_size=50.0, max_speed=10.0, max_acceleration=5.0, num_agents=4, collider_radius=1.0, d_sense=15):
         self.x_size = x_size # size of x dimension
         self.y_size = y_size # size of y dimension
         self.num_agents = num_agents
@@ -60,7 +60,7 @@ class MultiUAVWorld2D(gym.Env):
         first time.
         """
         self.window = None
-        self.clock = None
+        self.clock = None        
 
     def _get_obs(self, agent):            
         # Agent State
@@ -131,14 +131,16 @@ class MultiUAVWorld2D(gym.Env):
                     target_agent = self.agent_list[j]
                     if np.linalg.norm(target_agent.location - current_agent.location) <= 2*self.collider_radius:
                         replicated = True                        
-                        break           
+                        break
 
+       
         # Choose UAV's initial speed
         for i in range(self.num_agents):            
             # self.agent_list[i].velocity = np.random.uniform(self.min_speed, high=self.max_speed, size=(2,)).astype(np.float32)        
             self.agent_list[i].velocity = np.zeros(2)        
             self.agent_list[i].velocity_prev = self.agent_list[i].velocity
             self.agent_list[i].done = False
+            self.agent_list[i].collided = False
             # self.agent_list[i].velocity = np.zeros(2)
             # self.agent_list[i].velocity_prev = self.agent_list[i].velocity
 
@@ -163,6 +165,8 @@ class MultiUAVWorld2D(gym.Env):
         
         
         self.steps = 0
+        self.target_reach_count = 0
+        self.collision_count = 0
 
         n_observation = []
         for i in range(self.num_agents):
@@ -200,13 +204,18 @@ class MultiUAVWorld2D(gym.Env):
                 if obs_distance <= 2*self.collider_radius:
                     reward = -1   
                     collision = True
+                    if not self.agent_list[i].done and not self.agent_list[i].collided:
+                        self.collision_count += 1
+                        self.agent_list[i].collided = True
             
                     
             clipped_location = np.clip(self.agent_list[i].location, self.min_location , self.max_location)
             agent_speed = np.linalg.norm(self.agent_list[i].velocity)
 
             if distance < 0.5 and not collision and agent_speed < 0.2:  # An episode is done if the agent has reached the target        
-                done = True                          
+                done = True 
+                if not self.agent_list[i].done:                         
+                    self.target_reach_count += 1        
                 self.agent_list[i].finish()     
                 reward += 100
             elif (clipped_location != self.agent_list[i].location).any():  # An episode is done if the agent has gone out of box            
@@ -280,7 +289,7 @@ class MultiUAVWorld2D(gym.Env):
         
         agent_render_location = (self.agent_list[0].location + np.array([self.x_size/2, self.y_size/2])) * pixel_per_meter 
         agent_render_location[1] = self.window_size_y - agent_render_location[1] 
-        uav_in_range = self.agent_list[0].uavs_in_range(self.agent_list)
+        uav_in_range = self.agent_list[0].uavs_in_range(self.agent_list, self.d_sense)
         if len(uav_in_range)>0:            
             obs_render_location = (uav_in_range[0].location + np.array([self.x_size/2, self.y_size/2])) * pixel_per_meter 
             obs_render_location[1] = self.window_size_y - obs_render_location[1] 

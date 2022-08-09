@@ -15,14 +15,14 @@ from torchviz import make_dot
 
 
 MODEL_PATH = './weights/sac_multi'
-WARM_UP_STEPS = 4000
+WARM_UP_STEPS = 3000
 MAX_EPISOED_STEPS = 3000
-TOTAL_EPISODES = 10000
+TOTAL_EPISODES = 20000
 BATCH_SIZE = 256
-EVALUATE = True
+EVALUATE = False
 UPDATE_PER_STEP = 1
 LOAD_MODEL = False
-NUM_AGENTS = 5
+NUM_AGENTS = 12
 EPSILON_GREEDY = 0.95
 
 
@@ -71,7 +71,7 @@ for eps in range(TOTAL_EPISODES):
             if total_steps < WARM_UP_STEPS and not EVALUATE and not LOAD_MODEL: 
                 action = np.random.uniform(low=-1, high=1, size=(n_actions,))                       
             else:
-                action = agents[i].select_action(states[i], evaluate=False)        
+                action = agents[i].select_action(states[i], evaluate=EVALUATE)        
 
             v = (action[0]/2+0.5) * np.linalg.norm(env.action_space.high)     
             theta = action[1] * math.pi
@@ -113,20 +113,25 @@ for eps in range(TOTAL_EPISODES):
         else:
             # print(dones)
             if all(dones):
-                break
+                break            
+        
+    success_rate = env.target_reach_count / NUM_AGENTS
+    collision_rate = env.collision_count / NUM_AGENTS
     
     state, info = env.reset(return_info=True)
     eps_t = time.time() - eps_t
     steps_per_sec = eps_steps / eps_t
     sys.stdout.write("\033[K")
-    print("Total Steps = %d, Episode = %d, Score = %.3f, Steps Per Sec = %.2f" % (total_steps, eps, score, steps_per_sec))    
+    print("Total Steps = %d, Episode = %d, Score = %.3f, Steps Per Sec = %.2f, SR = %.2f, CR = %.2f" % (total_steps, eps, score, steps_per_sec, success_rate, collision_rate))    
     tb_writer.add_scalar("Score/Episodes", score, eps)
+    tb_writer.add_scalar("SR/Episodes", success_rate, eps)
+    tb_writer.add_scalar("CR/Episodes", collision_rate, eps)
 
     # print(torch.cuda.memory_summary())
 
     if not EVALUATE:
         agents[0].save_checkpoint(MODEL_PATH)
-        
+   
 
     tb_writer.flush()
 
