@@ -118,7 +118,7 @@ for eps in range(TOTAL_EPISODES):
             if all(dones):
                 break            
                 
-    state, info = env.reset(return_info=True)
+    states, _ = env.reset(return_info=True)
     eps_t = time.time() - eps_t
     steps_per_sec = eps_steps / eps_t
     sys.stdout.write("\033[K")
@@ -162,7 +162,7 @@ for eps in range(TOTAL_EPISODES):
             
             success_count += env.target_reach_count
             collision_count += env.collision_count     
-            state, info = env.reset(return_info=True)
+            states, _ = env.reset(return_info=True)
             eps_t = time.time() - eps_t
             steps_per_sec = eps_steps / eps_t       
             sys.stdout.write("\033[K")            
