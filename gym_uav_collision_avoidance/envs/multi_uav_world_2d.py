@@ -202,7 +202,7 @@ class MultiUAVWorld2D(gym.Env):
                 obs_distance = np.linalg.norm(target_agent.location - self.agent_list[i].location)
                 # reward -= 0.05 * (self.d_sense / (obs_distance + 2 * self.collider_radius))
                 if obs_distance <= 2*self.collider_radius:
-                    reward = -1   
+                    reward = -2   
                     collision = True
                     if not self.agent_list[i].done and not self.agent_list[i].collided:
                         self.collision_count += 1
@@ -217,9 +217,9 @@ class MultiUAVWorld2D(gym.Env):
                 if not self.agent_list[i].done:                         
                     self.target_reach_count += 1        
                 self.agent_list[i].finish()     
-                reward += 100
+                reward += 10
             elif (clipped_location != self.agent_list[i].location).any():  # An episode is done if the agent has gone out of box            
-                done = True                            
+                done = True                                 
             else:
                 done = False
             
