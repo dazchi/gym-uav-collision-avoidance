@@ -14,7 +14,7 @@ from pytorch_sac_temp.replay_memory import ReplayMemory
 from torchviz import make_dot
 
 
-MODEL_PATH = './weights/sac_multi'
+MODEL_PATH = './weights/td3_multi'
 WARM_UP_STEPS = 3000
 MAX_EPISOED_STEPS = 1500
 TOTAL_EPISODES = 2500
@@ -138,7 +138,7 @@ for eps in range(TOTAL_EPISODES):
                 converted_actions = []
 
                 for i in range(NUM_AGENTS):                
-                    action = agents[i].select_action(states[i], evaluate=True)        
+                    action = agents[i].select_action(states[i])        
                     v = (action[0]/2+0.5) * np.linalg.norm(env.action_space.high)     
                     theta = action[1] * math.pi                
                     converted_action = np.array([v*math.cos(theta), v*math.sin(theta)])
