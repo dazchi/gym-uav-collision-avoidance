@@ -10,7 +10,7 @@ from gym import spaces
 import pygame
 import numpy as np
 from gym_uav_collision_avoidance.envs.uav_agent import UAVAgent
-
+HARD_COLLISION_RADIUS = 0.5
 
 class MultiUAVWorld2D(gym.Env):
     metadata = {"render_fps": 1000}
@@ -204,6 +204,8 @@ class MultiUAVWorld2D(gym.Env):
                 if obs_distance <= 2*self.collider_radius:
                     reward = -2   
                     collision = True
+                
+                if obs_distance <= 2 * HARD_COLLISION_RADIUS:
                     if not self.agent_list[i].done and not self.agent_list[i].collided:
                         self.collision_count += 1
                         self.agent_list[i].collided = True
@@ -211,6 +213,8 @@ class MultiUAVWorld2D(gym.Env):
                     
             clipped_location = np.clip(self.agent_list[i].location, self.min_location , self.max_location)
             agent_speed = np.linalg.norm(self.agent_list[i].velocity)
+
+            
 
             if distance < 0.5 and not collision and agent_speed < 0.2:  # An episode is done if the agent has reached the target        
                 done = True 
