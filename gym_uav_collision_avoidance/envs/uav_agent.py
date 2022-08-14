@@ -1,6 +1,7 @@
 from math import fabs
 import gym
 import pygame
+import math
 import numpy as np
 
 class UAVAgent():
@@ -37,6 +38,8 @@ class UAVAgent():
     def finish(self):
         self.done = True
         self.velocity = self.velocity / np.linalg.norm(self.velocity) * 0.001
+        if np.isnan(self.velocity).any():
+            self.velocity = np.zeros_like(self.velocity)
 
     def uavs_in_range(self, uav_agents, d_sense=30):
         uavs = []
