@@ -7,7 +7,7 @@ from pytorch_sac_temp.model import GaussianPolicy, QNetwork
 
 
 class SAC(object):
-    def __init__(self, n_states, n_actions, lr=3e-4, tau=5e-3, gamma=0.99, alpah=10, target_update_interval=1, automatic_entropy_tuning=True):
+    def __init__(self, n_states, n_actions, lr=3e-4, tau=5e-3, gamma=0.99, alpah=0.5, target_update_interval=1, automatic_entropy_tuning=True):
 
         self.lr = lr
         self.tau = tau
@@ -67,7 +67,7 @@ class SAC(object):
         qf_loss.backward()
         self.critic_optim.step()
 
-        pi, log_pi, _ = self.policy.sample(state_batch)
+        pi, log_pi, _ = self.policy.sample(state_batch)        
 
         qf1_pi, qf2_pi = self.critic(state_batch, pi)
         min_qf_pi = torch.min(qf1_pi, qf2_pi)
@@ -98,21 +98,31 @@ class SAC(object):
         return qf1_loss.item(), qf2_loss.item(), policy_loss.item(), alpha_loss.item(), alpha_tlogs.item()
 
     # Save model parameters
-    def save_checkpoint(self, ckpt_path=None):
+    def save_checkpoint(self, ckpt_path, file_name=None):
         if not os.path.exists(ckpt_path):
             os.makedirs(ckpt_path)
+
+        if file_name is None:
+            file_name = '{}/weights.chpt'.format(ckpt_path)
+        else:
+            file_name = '{}/{}'.format(ckpt_path, file_name)
 
         torch.save({'policy_state_dict': self.policy.state_dict(),
                     'critic_state_dict': self.critic.state_dict(),
                     'critic_target_state_dict': self.critic_target.state_dict(),
                     'critic_optimizer_state_dict': self.critic_optim.state_dict(),
-                    'policy_optimizer_state_dict': self.policy_optim.state_dict()}, '{}/weights.chpt'.format(ckpt_path))
+                    'policy_optimizer_state_dict': self.policy_optim.state_dict()}, file_name)
 
     # Load model parameters
-    def load_checkpoint(self, ckpt_path, evaluate=False):
+    def load_checkpoint(self, ckpt_path, file_name=None, evaluate=False):
         print('Loading models from {}'.format(ckpt_path))
 
-        checkpoint = torch.load('{}/weights.chpt'.format(ckpt_path))
+        if file_name is None:
+            file_name = '{}/weights.chpt'.format(ckpt_path)
+        else:
+            file_name = '{}/{}'.format(ckpt_path, file_name)
+
+        checkpoint = torch.load(file_name)
         self.policy.load_state_dict(checkpoint['policy_state_dict'])
         self.critic.load_state_dict(checkpoint['critic_state_dict'])
         self.critic_target.load_state_dict(checkpoint['critic_target_state_dict'])

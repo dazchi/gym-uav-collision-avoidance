@@ -1,10 +1,5 @@
-from cmath import cos, pi
 import math
 import colorsys
-from random import randrange
-import re
-from turtle import position
-from cv2 import normalize, resizeWindow
 import gym
 from gym import spaces
 import pygame
@@ -118,7 +113,15 @@ class MultiUAVWorld2D(gym.Env):
             "distance": 0
         }
 
-    def reset(self, return_info=False, options=None):
+    def reset(self, return_info=False, circular=False):
+        # Choose UAV's initial speed
+        for i in range(self.num_agents):            
+            # self.agent_list[i].velocity = np.random.uniform(self.min_speed, high=self.max_speed, size=(2,)).astype(np.float32)        
+            self.agent_list[i].velocity = np.zeros(2)        
+            self.agent_list[i].velocity_prev = self.agent_list[i].velocity
+            self.agent_list[i].done = False
+            self.agent_list[i].collided = False         
+        
         # Choose the UAV's location uniformly at random
         self.agent_list[0].location = np.random.uniform(self.min_location, high=self.max_location, size=(2,)).astype(np.float32)
         for i in range(self.num_agents - 1):                           
@@ -132,18 +135,7 @@ class MultiUAVWorld2D(gym.Env):
                     if np.linalg.norm(target_agent.location - current_agent.location) <= 2*self.collider_radius:
                         replicated = True                        
                         break
-
-       
-        # Choose UAV's initial speed
-        for i in range(self.num_agents):            
-            # self.agent_list[i].velocity = np.random.uniform(self.min_speed, high=self.max_speed, size=(2,)).astype(np.float32)        
-            self.agent_list[i].velocity = np.zeros(2)        
-            self.agent_list[i].velocity_prev = self.agent_list[i].velocity
-            self.agent_list[i].done = False
-            self.agent_list[i].collided = False
-            # self.agent_list[i].velocity = np.zeros(2)
-            # self.agent_list[i].velocity_prev = self.agent_list[i].velocity
-
+             
         # Choose the UAV's target location uniformly at random        
         for i in range(self.num_agents):                           
             replicated = True
@@ -161,9 +153,16 @@ class MultiUAVWorld2D(gym.Env):
                             break
             self.agent_list[i].init_distance = np.linalg.norm(self.agent_list[i].target_location - self.agent_list[i].location)
             self.agent_list[i].prev_distance = self.agent_list[i].init_distance
-                 
         
-        
+        if circular:
+            for i in range(self.num_agents):
+                theta = 2 * i * math.pi / self.num_agents
+                self.agent_list[i].location = 20 * np.ones(2) * np.array([math.cos(theta), math.sin(theta)])
+                self.agent_list[i].target_location = 23 * np.ones(2) * np.array([math.cos(theta+math.pi), math.sin(theta+math.pi)])
+                self.agent_list[i].init_distance = np.linalg.norm(self.agent_list[i].target_location - self.agent_list[i].location)
+                self.agent_list[i].prev_distance = self.agent_list[i].init_distance
+
+
         self.steps = 0
         self.target_reach_count = 0
         self.collision_count = 0
@@ -175,7 +174,7 @@ class MultiUAVWorld2D(gym.Env):
         info = self._get_info()
         return (n_observation, info) if return_info else n_observation
 
-    def step(self, n_action):           
+    def step(self, n_action, evaluate=False):           
         n_reward = []
         n_done = []   
                  
@@ -223,7 +222,7 @@ class MultiUAVWorld2D(gym.Env):
                 self.agent_list[i].finish()     
                 reward += 10
             elif (clipped_location != self.agent_list[i].location).any():  # An episode is done if the agent has gone out of box            
-                done = True                                 
+                done = True & (not evaluate)
             else:
                 done = False
             

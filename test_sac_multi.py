@@ -2,10 +2,8 @@ import sys
 import os
 import random
 import time
-from turtle import done
 import torch
 import math
-import gc
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 from gym_uav_collision_avoidance.envs import MultiUAVWorld2D
@@ -23,7 +21,7 @@ UPDATE_PER_STEP = 1
 EVALUATE_EPISODES = 10
 EVALUATE = False
 LOAD_MODEL = False
-NUM_AGENTS = 12
+NUM_AGENTS = 10
 EPSILON_GREEDY = 0.95
 
 
@@ -47,7 +45,7 @@ for i in range(NUM_AGENTS):
 
 if EVALUATE or LOAD_MODEL:    
     for i in range(NUM_AGENTS):
-        agents[i].load_checkpoint(MODEL_PATH, EVALUATE)
+        agents[i].load_checkpoint(MODEL_PATH, evaluate=EVALUATE)
     
 # o = torch.zeros(2,n_observations, dtype=torch.float, requires_grad=False, device=device)
 # a = torch.zeros(2,n_actions, dtype=torch.float, requires_grad=False, device=device)
@@ -60,15 +58,15 @@ if EVALUATE or LOAD_MODEL:
 memory = ReplayMemory(int(1e6))
 updates = 0
 total_steps = 0
-
-states, _ = env.reset(return_info=True)
-for eps in range(TOTAL_EPISODES):    
+best_score = -1e6
+states, _ = env.reset(return_info=True, circular=True)
+for eps in range(TOTAL_EPISODES):                    
     score = 0
     eps_t = time.time()
     eps_steps = 0
     for steps in range(MAX_EPISOED_STEPS):
         actions = []
-        converted_actions = []
+        converted_actions = []        
 
         for i in range(NUM_AGENTS):                
             if total_steps < WARM_UP_STEPS and not EVALUATE and not LOAD_MODEL: 
@@ -118,7 +116,7 @@ for eps in range(TOTAL_EPISODES):
             if all(dones):
                 break            
                 
-    states, _ = env.reset(return_info=True)
+    states, _ = env.reset(return_info=True, circular=eps%2)
     eps_t = time.time() - eps_t
     steps_per_sec = eps_steps / eps_t
     sys.stdout.write("\033[K")
@@ -135,7 +133,8 @@ for eps in range(TOTAL_EPISODES):
         print("-----------Start Evaluating-----------")
         success_count = 0
         collision_count = 0
-        for eva_eps in range(EVALUATE_EPISODES):
+        total_score = 0
+        for eva_eps in range(EVALUATE_EPISODES):           
             score = 0
             eps_t = time.time()            
             for eps_steps in range(MAX_EPISOED_STEPS):
@@ -162,7 +161,8 @@ for eps in range(TOTAL_EPISODES):
             
             success_count += env.target_reach_count
             collision_count += env.collision_count     
-            states, _ = env.reset(return_info=True)
+            total_score += score
+            states, _ = env.reset(return_info=True, circular=eva_eps % 2)
             eps_t = time.time() - eps_t
             steps_per_sec = eps_steps / eps_t       
             sys.stdout.write("\033[K")            
@@ -172,10 +172,16 @@ for eps in range(TOTAL_EPISODES):
         print(collision_count)
         success_rate = success_count / (NUM_AGENTS * EVALUATE_EPISODES)
         collision_rate = collision_count / (NUM_AGENTS * EVALUATE_EPISODES)
-        print("SR = %.2f, CR = %.2f" % (success_rate, collision_rate)) 
+        avg_score = total_score / EVALUATE_EPISODES
+        print("SR = %.2f, CR = %.2f, Avg_Score = %.2f" % (success_rate, collision_rate, avg_score)) 
         tb_writer.add_scalar("SR/Episodes", success_rate, eps)
         tb_writer.add_scalar("CR/Episodes", collision_rate, eps)
+        tb_writer.add_scalar("Avg_Score/Episodes", collision_rate, eps)
         tb_writer.flush()
+        if avg_score > best_score:
+            best_score = avg_score
+            agents[0].save_checkpoint(MODEL_PATH, 'best.chpt')
+
         print("-----------End Evaluating-----------")
 
 env.close()

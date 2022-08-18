@@ -1,18 +1,10 @@
-from pickle import TRUE
-import sys
-import os
-import random
 import time
-from turtle import done
 import torch
 import math
-import gc
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
-from gym_uav_collision_avoidance.envs import MultiUAVWorld2DEvaluate
+from gym_uav_collision_avoidance.envs import MultiUAVWorld2D
 from pytorch_sac_temp.sac import SAC
-from pytorch_sac_temp.replay_memory import ReplayMemory
-from torchviz import make_dot
 
 
 MODEL_PATH = './weights/sac_multi'
@@ -29,15 +21,15 @@ comment = "evaluate %"
 tb_writer = SummaryWriter(comment=comment)
 
 agents = []
-dummy_env = MultiUAVWorld2DEvaluate(num_agents=1)
+dummy_env = MultiUAVWorld2D(num_agents=1)
 n_observations = dummy_env.observation_space.shape[0]
 n_actions = dummy_env.action_space.shape[0]
 for i in range(MAX_NUM_AGENTS):
     agents.append(SAC(n_observations, n_actions))
-    agents[i].load_checkpoint(MODEL_PATH, True)
+    agents[i].load_checkpoint(MODEL_PATH, evaluate=True)
 
 for n_agnet in range(1,MAX_NUM_AGENTS+1):
-    env = MultiUAVWorld2DEvaluate(num_agents=n_agnet)
+    env = MultiUAVWorld2D(num_agents=n_agnet)
           
     success_count = 0
     collision_count = 0

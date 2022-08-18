@@ -1,3 +1,2 @@
 from gym_uav_collision_avoidance.envs.uav_world_2d import UAVWorld2D
 from gym_uav_collision_avoidance.envs.multi_uav_world_2d import MultiUAVWorld2D
-from gym_uav_collision_avoidance.envs.multi_uav_world_2d_evaluate import MultiUAVWorld2DEvaluate
