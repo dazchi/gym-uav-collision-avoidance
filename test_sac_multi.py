@@ -152,7 +152,9 @@ for eps in range(TOTAL_EPISODES):
                                 
                 next_states, rewards, dones, _ = env.step(converted_actions) # Step                                                                                                                                                                       
                 states = next_states
-                score += rewards[0]                 
+                score += rewards[0]              
+                for i in range(NUM_AGENTS):
+                    total_score += rewards[i] * (1-dones[i])
                 print("EVA: Steps = %d, Reward = %.3f, Score = %.3f" % (steps, rewards[0], score), end='\r')        
                 env.render()
 
@@ -160,8 +162,7 @@ for eps in range(TOTAL_EPISODES):
                     break
             
             success_count += env.target_reach_count
-            collision_count += env.collision_count     
-            total_score += score
+            collision_count += env.collision_count                 
             states, _ = env.reset(return_info=True, circular=eva_eps % 2)
             eps_t = time.time() - eps_t
             steps_per_sec = eps_steps / eps_t       
@@ -172,7 +173,7 @@ for eps in range(TOTAL_EPISODES):
         print(collision_count)
         success_rate = success_count / (NUM_AGENTS * EVALUATE_EPISODES)
         collision_rate = collision_count / (NUM_AGENTS * EVALUATE_EPISODES)
-        avg_score = total_score / EVALUATE_EPISODES
+        avg_score = total_score / (NUM_AGENTS * EVALUATE_EPISODES)
         print("SR = %.2f, CR = %.2f, Avg_Score = %.2f" % (success_rate, collision_rate, avg_score)) 
         tb_writer.add_scalar("SR/Episodes", success_rate, eps)
         tb_writer.add_scalar("CR/Episodes", collision_rate, eps)
