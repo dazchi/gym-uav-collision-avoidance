@@ -15,7 +15,7 @@ from torchviz import make_dot
 MODEL_PATH = './weights/sac_multi'
 WARM_UP_STEPS = 3000
 MAX_EPISOED_STEPS = 1500
-TOTAL_EPISODES = 2500
+TOTAL_EPISODES = 10000
 BATCH_SIZE = 256
 UPDATE_PER_STEP = 1
 EVALUATE_EPISODES = 10
@@ -182,6 +182,7 @@ for eps in range(TOTAL_EPISODES):
         if avg_score > best_score:
             best_score = avg_score
             agents[0].save_checkpoint(MODEL_PATH, 'best.chpt')
+            print("Saving Best Model")
 
         print("-----------End Evaluating-----------")
 
