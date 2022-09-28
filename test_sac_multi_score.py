@@ -50,7 +50,7 @@ for n_agnet in range(1,MAX_NUM_AGENTS+1):
                 actions.append(action)
                 converted_actions.append(converted_action)
             
-            next_states, rewards, dones, _ = env.step(converted_actions) # Step                   
+            next_states, rewards, dones, _ = env.step(converted_actions, evaluate=True) # Step                   
             states = next_states
             score += rewards[0]
             eps_steps += 1            

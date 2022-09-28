@@ -38,22 +38,25 @@ plt.rcParams["font.family"] = "Times New Roman"
 # plt.legend(fontsize=12) # Legend size
 # plt.grid(alpha=0.3)
 
+for i in range(len(sac_sr)):
+    print('%2d\t%.2f\t%.2f' % (i+1,sac_sr[i]*100.0, sac_cr[i]*100.0))
+
 
 plt.figure()
 ax1 = plt.subplot()
-plt.xlabel('total agents', fontsize=12)
+plt.xlabel('total agents', fontsize=18)
 l1_1 = ax1.plot(sac_sr_eps, sac_sr, label= r'$\textrm{raw}\ \mathit{SR}$', alpha=ALPHA)
 l1_2 = ax1.plot(sac_sr_eps, sac_sr_smoothed, label=r'$\textrm{smoothed}\ \mathit{SR}$', color=l1_1[0].get_color())
-plt.ylabel(r'$\textrm{Success Rate}\ (\mathit{SR})$', fontsize=12, loc = 'center')
-plt.legend(bbox_to_anchor=(0,0.8,1,0.2), loc="lower right")
+plt.ylabel(r'$\textrm{Success Rate}\ (\mathit{SR})$', fontsize=18)
+plt.legend(bbox_to_anchor=(0,0.8,1,0.2), loc="lower right", fontsize=18)
 ax2 = ax1.twinx()
 l2_1 = ax2.plot(sac_cr_eps, sac_cr, label= r'$\textrm{raw}\ \mathit{CR}$', alpha=ALPHA, color = 'orange')
 l2_2 = ax2.plot(sac_cr_eps, sac_cr_smoothed, label=r'$\textrm{smoothed}\ \mathit{CR}$', color=l2_1[0].get_color())
-plt.ylabel(r'$\textrm{Collision Rate}\ (\mathit{CR})$', fontsize=12)
+plt.ylabel(r'$\textrm{Collision Rate}\ (\mathit{CR})$', fontsize=18)
 
-plt.legend(fontsize=12)
+plt.legend(fontsize=18)
 plt.grid(alpha=0.3)
-plt.legend(bbox_to_anchor=(0,0.2,1,0.2), loc="lower left")
+plt.legend(bbox_to_anchor=(0,0.2,1,0.2), loc="lower left", fontsize=18)
 
 plt.show()
 

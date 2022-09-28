@@ -59,7 +59,7 @@ memory = ReplayMemory(int(1e6))
 updates = 0
 total_steps = 0
 best_score = -1e6
-states, _ = env.reset(return_info=True, circular=True)
+states, _ = env.reset(return_info=True)
 for eps in range(TOTAL_EPISODES):                    
     score = 0
     eps_t = time.time()
@@ -116,7 +116,7 @@ for eps in range(TOTAL_EPISODES):
             if all(dones):
                 break            
                 
-    states, _ = env.reset(return_info=True, circular=eps%2)
+    states, _ = env.reset(return_info=True)
     eps_t = time.time() - eps_t
     steps_per_sec = eps_steps / eps_t
     sys.stdout.write("\033[K")
@@ -163,7 +163,7 @@ for eps in range(TOTAL_EPISODES):
             
             success_count += env.target_reach_count
             collision_count += env.collision_count                 
-            states, _ = env.reset(return_info=True, circular=eva_eps % 2)
+            states, _ = env.reset(return_info=True)
             eps_t = time.time() - eps_t
             steps_per_sec = eps_steps / eps_t       
             sys.stdout.write("\033[K")            
@@ -177,12 +177,8 @@ for eps in range(TOTAL_EPISODES):
         print("SR = %.2f, CR = %.2f, Avg_Score = %.2f" % (success_rate, collision_rate, avg_score)) 
         tb_writer.add_scalar("SR/Episodes", success_rate, eps)
         tb_writer.add_scalar("CR/Episodes", collision_rate, eps)
-        tb_writer.add_scalar("Avg_Score/Episodes", collision_rate, eps)
         tb_writer.flush()
-        if avg_score > best_score:
-            best_score = avg_score
-            agents[0].save_checkpoint(MODEL_PATH, 'best.chpt')
-            print("Saving Best Model")
+
 
         print("-----------End Evaluating-----------")
 

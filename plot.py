@@ -101,12 +101,12 @@ p = plt.plot(sac_sr_eps, sac_sr, alpha=ALPHA)
 plt.plot(sac_sr_eps, sac_sr_smoothed, label='SAC', color=p[0].get_color())
 
 p = plt.plot(td3_sr_eps, td3_sr, alpha=ALPHA)
-plt.plot(td3_sr_eps, td3_sr_smoothed, label='TD3', color=p[0].get_color())
+plt.plot(td3_sr_eps, td3_sr_smoothed, label='TD3', color=p[0].get_color(), ls='--')
 
 p = plt.plot(ddpg_sr_eps, ddpg_sr, alpha=ALPHA)
-plt.plot(ddpg_sr_eps, ddpg_sr_smoothed, label='DDPG', color=p[0].get_color())
+plt.plot(ddpg_sr_eps, ddpg_sr_smoothed, label='DDPG', color=p[0].get_color(), ls='-.')
 
-plt.xlabel('epsiodes', fontsize=16)
+plt.xlabel('episodes', fontsize=16)
 plt.ylabel(r'$\textrm{Success Rate}\ (\mathit{SR})$', fontsize=16)
 plt.legend(fontsize=12) # Legend size
 plt.grid(alpha=0.3)
@@ -116,12 +116,12 @@ p = plt.plot(sac_cr_eps, sac_cr, alpha=ALPHA)
 plt.plot(sac_cr_eps, sac_cr_smoothed, label='SAC', color=p[0].get_color())
 
 p = plt.plot(td3_cr_eps, td3_cr, alpha=ALPHA)
-plt.plot(td3_cr_eps, td3_cr_smoothed, label='TD3', color=p[0].get_color())
+plt.plot(td3_cr_eps, td3_cr_smoothed, label='TD3', color=p[0].get_color(), ls='--')
 
 p = plt.plot(ddpg_cr_eps, ddpg_cr, alpha=ALPHA)
-plt.plot(ddpg_cr_eps, ddpg_cr_smoothed, label='DDPG', color=p[0].get_color())
+plt.plot(ddpg_cr_eps, ddpg_cr_smoothed, label='DDPG', color=p[0].get_color(), ls='-.')
 
-plt.xlabel('epsiodes', fontsize=16)
+plt.xlabel('episodes', fontsize=16)
 plt.ylabel(r'$\textrm{Collision Rate}\ (\mathit{CR})$', fontsize=16)
 plt.legend(fontsize=12) # Legend size
 plt.grid(alpha=0.3)
@@ -136,7 +136,7 @@ plt.plot(sac_score_eps, sac_score_smoothed, label=r'$\textrm{smoothed}$', color=
 # p = plt.plot(ddpg_score_eps, ddpg_score, alpha=ALPHA)
 # plt.plot(ddpg_score_eps, ddpg_score_smoothed, label='DDPG', color=p[0].get_color())
 
-plt.xlabel('epsiodes', fontsize=16)
+plt.xlabel('episodes', fontsize=16)
 plt.ylabel('score', fontsize=16)
 plt.legend(fontsize=12) # Legend size
 plt.grid(alpha=0.3)

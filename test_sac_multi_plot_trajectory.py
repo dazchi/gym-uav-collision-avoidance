@@ -31,7 +31,7 @@ env = MultiUAVWorld2D(num_agents=N_AGENT)
 n_observations = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
 agent = SAC(n_observations, n_actions)
-agent.load_checkpoint(MODEL_PATH, evaluate=True)
+agent.load_checkpoint(MODEL_PATH, evaluate=True, file_name='weights.chpt')
 
 for i in range(N_AGENT):
     trajectories.append([])
@@ -48,6 +48,7 @@ for i in range(N_AGENT):
     depots.append(deepcopy(env.agent_list[i].location))
     goals.append(env.agent_list[i].target_location)
 
+wait = True
 for steps in range(MAX_EPISOED_STEPS):
     actions = []
     converted_actions = []
@@ -66,7 +67,11 @@ for steps in range(MAX_EPISOED_STEPS):
     
     next_states, _, dones, _ = env.step(converted_actions) # Step                   
     states = next_states
-    env.render()       
+    env.render()
+
+    if wait:
+        input()
+    wait = False
     
     if all(dones):
         break         
@@ -110,6 +115,7 @@ square = mlines.Line2D([], [], color='black', marker='s', linestyle='None',
                           markersize=10, label='Goals', fillstyle='none')
 
 plt.legend(handles=[triangle, square])
+input()
 plt.show()
 
         
